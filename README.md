@@ -20,7 +20,7 @@ make dev
   make build
 ```
 
-[] Github repo setup (monorepo)
-[] Hello world for Go and Solid apps
-[] Deploy to Fly.io
-[] Github actions to CI/CD
+- [x] Github repo setup (monorepo)
+- [x] Hello world for Go and Solid apps
+- [x] Deploy to Fly.io
+- [x] Github actions to CI/CD
