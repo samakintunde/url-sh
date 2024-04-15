@@ -1,5 +1,9 @@
 # URL Shortener
 
+Web: https://url-sh.fly.dev/
+API: https://url-sh.fly.dev/api
+Health: https://url-sh.fly.dev/health
+
 ## Install dependencies
 
 Installs dependencies of the web client
