@@ -9,7 +9,6 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-	"url-shortener/web"
 )
 
 func main() {
@@ -27,7 +26,7 @@ func run(ctx context.Context, env func(string, string) string) error {
 	defer stop()
 
 	config := InitConfig(env)
-	fs := web.InitWebServer()
+	fs := InitWebServer()
 	srv := NewServer(fs)
 
 	httpServer := &http.Server{
