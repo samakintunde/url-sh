@@ -41,9 +41,13 @@ clean:
 	$(MAKE) clean-web & $(MAKE) clean-server
 
 vet:
+	go vet
 	sqlc vet
 
 start-darwin:
 	yarn --cwd web build
 	CGO_ENABLED=1 GOARCH=amd64 GOOS=darwin go build -o bin/$(BINARY_NAME)-darwin .
 	bin/${BINARY_NAME}-darwin
+
+gen-sqlc:
+	sqlc generate
