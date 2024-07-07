@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -10,6 +11,11 @@ import (
 	"syscall"
 	"time"
 	"url-shortener/web"
+
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/sqlite3"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 func main() {
@@ -21,14 +27,35 @@ func main() {
 	}
 }
 
+var interruptSignals = []os.Signal{
+	os.Interrupt,
+	syscall.SIGTERM,
+	syscall.SIGINT,
+}
+
 func run(ctx context.Context, env func(string, string) string) error {
-	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(ctx, interruptSignals...)
 
 	defer stop()
 
 	config := InitConfig(env)
 	fs := web.InitWebServer()
 	srv := NewServer(fs)
+	db, err := initDB(config)
+
+	if err != nil {
+		slog.Error("couldn't init db", err)
+		return err
+	}
+
+	defer db.Close()
+
+	err = runMigration(db, config)
+
+	if err != nil {
+		slog.Error("couldn't run migrations", err)
+		return err
+	}
 
 	httpServer := &http.Server{
 		Addr:         config.HttpAddr,
@@ -58,6 +85,41 @@ func run(ctx context.Context, env func(string, string) string) error {
 		}
 		slog.Info("server shut down")
 	}
+
+	return nil
+}
+
+func initDB(cfg Config) (*sql.DB, error) {
+	db, err := sql.Open("sqlite3", cfg.DatabaseUri)
+	if err != nil {
+		return nil, err
+	}
+	if err = db.Ping(); err != nil {
+		return nil, err
+	}
+	return db, nil
+}
+
+func runMigration(db *sql.DB, config Config) error {
+	// Will wrap each migration in an implicit transaction by default
+	driver, err := sqlite3.WithInstance(db, &sqlite3.Config{})
+	if err != nil {
+		return err
+	}
+
+	migration, err := migrate.NewWithDatabaseInstance(config.MigrationSourceURL, "sqlite3", driver)
+
+	if err != nil {
+		return err
+	}
+
+	err = migration.Up()
+
+	if err != nil && err != migrate.ErrNoChange {
+		return err
+	}
+
+	slog.Info("migrations completed successfully")
 
 	return nil
 }
