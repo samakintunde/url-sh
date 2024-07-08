@@ -7,25 +7,74 @@ package db
 
 import (
 	"context"
+	"database/sql"
+	"time"
 )
 
 const createUser = `-- name: CreateUser :exec
-INSERT INTO users (id, email, password) VALUES (?, ?, ?)
+INSERT INTO users (id, email, first_name, last_name, password) VALUES (?, ?, ?, ?, ?)
 `
 
 type CreateUserParams struct {
-	ID       string
-	Email    string
-	Password string
+	ID        string
+	Email     string
+	FirstName sql.NullString
+	LastName  sql.NullString
+	Password  string
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) error {
-	_, err := q.db.ExecContext(ctx, createUser, arg.ID, arg.Email, arg.Password)
+	_, err := q.db.ExecContext(ctx, createUser,
+		arg.ID,
+		arg.Email,
+		arg.FirstName,
+		arg.LastName,
+		arg.Password,
+	)
 	return err
 }
 
+const deactivateUser = `-- name: DeactivateUser :exec
+UPDATE users SET active = false WHERE id = ?
+`
+
+func (q *Queries) DeactivateUser(ctx context.Context, id string) error {
+	_, err := q.db.ExecContext(ctx, deactivateUser, id)
+	return err
+}
+
+const deleteUser = `-- name: DeleteUser :exec
+DELETE FROM users WHERE id = ?
+`
+
+func (q *Queries) DeleteUser(ctx context.Context, id string) error {
+	_, err := q.db.ExecContext(ctx, deleteUser, id)
+	return err
+}
+
+const getUser = `-- name: GetUser :one
+SELECT id, email, first_name, last_name, password, email_verified, active, created_at, updated_at FROM users WHERE id = ? LIMIT 1
+`
+
+func (q *Queries) GetUser(ctx context.Context, id string) (User, error) {
+	row := q.db.QueryRowContext(ctx, getUser, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.FirstName,
+		&i.LastName,
+		&i.Password,
+		&i.EmailVerified,
+		&i.Active,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, password, name FROM users WHERE email = ? LIMIT 1
+SELECT id, email, first_name, last_name, password, email_verified, active, created_at, updated_at FROM users WHERE email = ? LIMIT 1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -34,8 +83,28 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
+		&i.FirstName,
+		&i.LastName,
 		&i.Password,
-		&i.Name,
+		&i.EmailVerified,
+		&i.Active,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const verifyUserById = `-- name: VerifyUserById :exec
+UPDATE users SET email_verified = ?, updated_at = ? WHERE id = ?
+`
+
+type VerifyUserByIdParams struct {
+	EmailVerified bool
+	UpdatedAt     time.Time
+	ID            string
+}
+
+func (q *Queries) VerifyUserById(ctx context.Context, arg VerifyUserByIdParams) error {
+	_, err := q.db.ExecContext(ctx, verifyUserById, arg.EmailVerified, arg.UpdatedAt, arg.ID)
+	return err
 }

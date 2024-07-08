@@ -6,11 +6,17 @@ package db
 
 import (
 	"database/sql"
+	"time"
 )
 
 type User struct {
-	ID       string
-	Email    string
-	Password string
-	Name     sql.NullString
+	ID            string
+	Email         string
+	FirstName     sql.NullString
+	LastName      sql.NullString
+	Password      string
+	EmailVerified bool
+	Active        bool
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
