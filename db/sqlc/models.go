@@ -16,7 +16,8 @@ type User struct {
 	LastName      sql.NullString
 	Password      string
 	EmailVerified bool
-	Active        bool
+	Status        interface{}
+	LastLoginAt   sql.NullTime
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 }
