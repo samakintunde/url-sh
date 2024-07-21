@@ -26,25 +26,19 @@ make dev
   make build
 ```
 
-### Step 1
+### Currently...
 
-- [x] Github repo setup (monorepo)
-- [x] Hello world for Go and Solid apps
-- [x] Deploy to Fly.io
-- [x] Github actions to CI/CD
-
-### Step 2
-
-- [] Connect DB
-- [] Backend first
-  - [] URL shortener
-    - [] Shorten
-    - [] Unshorten
+- [x] Connect DB
+- [] Backend
+  - [] Logs
+    - Obscure sensitive details from logs
   - [] Auth
+    - [] Simplify validation logic
     - [] Register
-      - [] Insert user to DB
-      - [] Hash password
-      - [] (Email…?)
+      - [x] Insert user in DB
+      - [] Add password rules (alphanum, upper+lower, numbers, symbols)
+      - [] Send verification email
+      - [] Verify Account
     - [] Login
       - [] Check if user in DB
       - [] Compare password
