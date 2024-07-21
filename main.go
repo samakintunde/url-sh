@@ -39,6 +39,10 @@ func run(ctx context.Context, env func(string, string) string) error {
 
 	defer stop()
 
+	validate := InitValidator()
+	ut := InitUniversalTranslator(validate)
+	trans := InitTranslator(validate, ut)
+
 	config := InitConfig(env)
 	sqliteDB, err := initDB(config)
 
@@ -56,10 +60,10 @@ func run(ctx context.Context, env func(string, string) string) error {
 		return err
 	}
 
-	_ = db.New(sqliteDB)
+	queries := db.New(sqliteDB)
 
 	fs := web.InitWebServer()
-	srv := NewServer(fs)
+	srv := NewServer(ctx, fs, queries, validate, ut, trans)
 
 	httpServer := &http.Server{
 		Addr:         config.HttpAddr,
