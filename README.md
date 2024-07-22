@@ -36,6 +36,7 @@ make dev
     - [] Simplify validation logic
     - [] Register
       - [x] Insert user in DB
+      - [] Check if user password in https://haveibeenpwned.com
       - [] Add password rules (alphanum, upper+lower, numbers, symbols)
       - [] Send verification email
       - [] Verify Account
