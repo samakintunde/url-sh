@@ -36,8 +36,10 @@ make dev
     - [] Simplify validation logic
     - [] Register
       - [x] Insert user in DB
-      - [] Check if user password in https://haveibeenpwned.com
-      - [] Add password rules (alphanum, upper+lower, numbers, symbols)
+      - [x] Check if user password in https://haveibeenpwned.com
+      - [x] Add password rules (alphanum, upper+lower, numbers, symbols)
+      - [] Wrap serial database actions in tx for all-or-none commits
+      - [] Remove `email_verified` column from `users` table
       - [] Send verification email
       - [] Verify Account
     - [] Login

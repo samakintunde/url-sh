@@ -13,6 +13,7 @@ CREATE TABLE users (
 
 CREATE INDEX idx_users_email ON users(email);
 
+
 CREATE TRIGGER update_users_updated_at
 AFTER UPDATE ON users
 FOR EACH ROW

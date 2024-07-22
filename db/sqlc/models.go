@@ -9,6 +9,16 @@ import (
 	"time"
 )
 
+type EmailVerification struct {
+	ID         int64
+	UserID     string
+	Email      string
+	Code       string
+	CreatedAt  time.Time
+	ExpiresAt  time.Time
+	VerifiedAt sql.NullTime
+}
+
 type User struct {
 	ID            string
 	Email         string

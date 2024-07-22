@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"reflect"
+	"time"
 	db "url-shortener/db/sqlc"
 
 	ut "github.com/go-playground/universal-translator"
@@ -179,6 +180,8 @@ func HandleSignup(ctx context.Context, queries *db.Queries, validate *validator.
 				},
 			}
 
+			// TODO: Wrap database actions in a transaction
+
 			// Create User in DB
 			createdUser, err := queries.CreateUser(ctx, userParams)
 
@@ -196,19 +199,35 @@ func HandleSignup(ctx context.Context, queries *db.Queries, validate *validator.
 				})
 				return
 			}
+			slog.Info("created user", "user", createdUser.ID)
 
 			// Send verification e-mail
-			// ?
+			code, err := GenerateVerificationToken()
+
+			if err != nil {
+				slog.Error("couldn't generate verification token", "error", err)
+				respondWithJSON(w, http.StatusInternalServerError, map[string]any{
+					"errors": []string{http.StatusText(http.StatusInternalServerError)},
+				})
+				return
+			}
+
+			emailVerificationParam := db.CreateEmailVerificationParams{
+				UserID:    createdUser.ID,
+				Email:     createdUser.Email,
+				Code:      code,
+				ExpiresAt: time.Now().Add(time.Minute * 15),
+			}
+			queries.CreateEmailVerification(ctx, emailVerificationParam)
+			slog.Info("created email verification", "email", createdUser.Email, "code", code)
 
 			// Serve success response
-			// TODO: hide sensitive details like password from logs
 			data := response{
 				ID:        createdUser.ID,
 				Email:     createdUser.Email,
 				FirstName: createdUser.FirstName.String,
 				LastName:  createdUser.LastName.String,
 			}
-			slog.Info("created user", "user", data)
 			respondWithJSON(w, http.StatusCreated, map[string]any{
 				"data": data,
 			})
