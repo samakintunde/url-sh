@@ -5,6 +5,8 @@ import (
 	"encoding/base64"
 	"fmt"
 
+	hibp "github.com/mattevans/pwned-passwords"
+	"github.com/nbutton23/zxcvbn-go"
 	"golang.org/x/crypto/argon2"
 )
 
@@ -46,4 +48,18 @@ func HashPassword(password string) (string, error) {
 		base64.RawStdEncoding.EncodeToString(hash))
 
 	return encodedHash, nil
+}
+
+func checkPasswordStrength(password string) bool {
+	strength := zxcvbn.PasswordStrength(password, nil)
+	return strength.Score >= 3
+}
+
+func checkPasswordPwned(password string) (bool, error) {
+	client := hibp.NewClient()
+	compromised, err := client.Compromised(password)
+	if err != nil {
+		return false, err
+	}
+	return compromised, nil
 }

@@ -31,21 +31,21 @@ func (v ValidationError) Error() string {
 }
 
 func HandleSignup(ctx context.Context, queries *db.Queries, validate *validator.Validate, ut *ut.UniversalTranslator, trans ut.Translator) http.Handler {
-	type SignUpRequest struct {
+	type request struct {
 		Email     string `json:"email" validate:"required,email"`
-		Password  string `json:"password" validate:"required,min=8"`
+		Password  string `json:"password" validate:"required,min=8,max=50,password"`
 		FirstName string `json:"first_name" validate:"required"`
 		LastName  string `json:"last_name" validate:"required"`
 	}
 
-	type SignUpResponse struct {
+	type response struct {
 		ID        string `json:"id"`
 		Email     string `json:"email"`
 		FirstName string `json:"first_name"`
 		LastName  string `json:"last_name"`
 	}
 
-	validateSignUpRequest := func(req SignUpRequest) []ValidationError {
+	validateSignUpRequest := func(req request) []ValidationError {
 		err := validate.Struct(req)
 		if err != nil {
 			var errors []ValidationError
@@ -58,9 +58,13 @@ func HandleSignup(ctx context.Context, queries *db.Queries, validate *validator.
 				case "required":
 					message = fmt.Sprintf("%s is required", jsonFieldName)
 				case "email":
-					message = "Invalid email format"
+					message = err.Translate(trans)
 				case "min":
 					message = fmt.Sprintf("%s must be at least %s characters long", jsonFieldName, err.Param())
+				case "max":
+					message = fmt.Sprintf("%s must be at most %s characters long", jsonFieldName, err.Param())
+				case "password":
+					message = err.Translate(trans)
 				default:
 					message = fmt.Sprintf("%s is invalid", jsonFieldName)
 				}
@@ -78,7 +82,7 @@ func HandleSignup(ctx context.Context, queries *db.Queries, validate *validator.
 	return http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			// Decode request body
-			req, err := decode[SignUpRequest](r)
+			req, err := decode[request](r)
 
 			if err != nil {
 				slog.Error("Invalid Request Payload", "error", err)
@@ -115,6 +119,38 @@ func HandleSignup(ctx context.Context, queries *db.Queries, validate *validator.
 				return
 			}
 
+			// Check Password Strength
+			isPasswordStrong := checkPasswordStrength(req.Password)
+
+			if !isPasswordStrong {
+				slog.Info("weak password", "email", req.Email)
+				respondWithJSON(w, http.StatusBadRequest, map[string]any{
+					"errors": []string{"Password is too weak. Please use a stronger password."},
+				})
+				return
+			}
+
+			// Check if Password is being re-used or has been leaked
+			// Losing about 250ms on this call to the haveibeenpwned API so disabling for now
+			//
+			// isPasswordPwned, err := checkPasswordPwned(req.Password)
+
+			// if err != nil {
+			// 	slog.Info("weak password", "email", req.Email)
+			// 	respondWithJSON(w, http.StatusInternalServerError, map[string]any{
+			// 		"errors": []string{"Something went wrong. Try again."},
+			// 	})
+			// 	return
+			// }
+
+			// if isPasswordPwned {
+			// 	slog.Info("reusing leaked password", "email", req.Email)
+			// 	respondWithJSON(w, http.StatusBadRequest, map[string]any{
+			// 		"errors": []string{"Password has been exposed in data breaches. Please use a different password."},
+			// 	})
+			// 	return
+			// }
+
 			// Generate ULID
 			id := NewULID()
 
@@ -129,7 +165,7 @@ func HandleSignup(ctx context.Context, queries *db.Queries, validate *validator.
 				return
 			}
 
-			user := db.CreateUserParams{
+			userParams := db.CreateUserParams{
 				ID:       id.String(),
 				Email:    req.Email,
 				Password: hashedPassword,
@@ -144,11 +180,11 @@ func HandleSignup(ctx context.Context, queries *db.Queries, validate *validator.
 			}
 
 			// Create User in DB
-			createdUser, err := queries.CreateUser(ctx, user)
+			createdUser, err := queries.CreateUser(ctx, userParams)
 
 			if err != nil {
 				if sqliteErr, ok := err.(sqlite3.Error); ok && sqliteErr.ExtendedCode == sqlite3.ErrConstraintUnique {
-					slog.Error("couldn't create user with email", "email", user.Email, "error", err)
+					slog.Error("couldn't create user with email", "email", userParams.Email, "error", err)
 					respondWithJSON(w, http.StatusConflict, map[string]any{
 						"errors": []string{"Account already exists"},
 					})
@@ -161,16 +197,20 @@ func HandleSignup(ctx context.Context, queries *db.Queries, validate *validator.
 				return
 			}
 
+			// Send verification e-mail
+			// ?
+
 			// Serve success response
 			// TODO: hide sensitive details like password from logs
-			slog.Info("created user", "user", createdUser)
+			data := response{
+				ID:        createdUser.ID,
+				Email:     createdUser.Email,
+				FirstName: createdUser.FirstName.String,
+				LastName:  createdUser.LastName.String,
+			}
+			slog.Info("created user", "user", data)
 			respondWithJSON(w, http.StatusCreated, map[string]any{
-				"data": SignUpResponse{
-					ID:        createdUser.ID,
-					Email:     createdUser.Email,
-					FirstName: createdUser.FirstName.String,
-					LastName:  createdUser.LastName.String,
-				},
+				"data": data,
 			})
 		},
 	)
