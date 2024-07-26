@@ -21,15 +21,32 @@ func (q *Queries) CleanExpiredEmailVerifications(ctx context.Context) error {
 	return err
 }
 
-const completeEmailVerification = `-- name: CompleteEmailVerification :exec
+const completeEmailVerification = `-- name: CompleteEmailVerification :one
 UPDATE email_verifications
 SET verified_at = CURRENT_TIMESTAMP
-WHERE code = ? AND expires_at > CURRENT_TIMESTAMP
+WHERE user_id = ? AND email = ? AND code = ? AND expires_at > CURRENT_TIMESTAMP
+RETURNING id, user_id, email, code, created_at, expires_at, verified_at
 `
 
-func (q *Queries) CompleteEmailVerification(ctx context.Context, code string) error {
-	_, err := q.db.ExecContext(ctx, completeEmailVerification, code)
-	return err
+type CompleteEmailVerificationParams struct {
+	UserID string
+	Email  string
+	Code   string
+}
+
+func (q *Queries) CompleteEmailVerification(ctx context.Context, arg CompleteEmailVerificationParams) (EmailVerification, error) {
+	row := q.db.QueryRowContext(ctx, completeEmailVerification, arg.UserID, arg.Email, arg.Code)
+	var i EmailVerification
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Email,
+		&i.Code,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+		&i.VerifiedAt,
+	)
+	return i, err
 }
 
 const createEmailVerification = `-- name: CreateEmailVerification :exec

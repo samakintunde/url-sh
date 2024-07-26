@@ -20,14 +20,13 @@ type EmailVerification struct {
 }
 
 type User struct {
-	ID            string
-	Email         string
-	FirstName     sql.NullString
-	LastName      sql.NullString
-	Password      string
-	EmailVerified bool
-	Status        interface{}
-	LastLoginAt   sql.NullTime
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	ID          string
+	Email       string
+	FirstName   sql.NullString
+	LastName    sql.NullString
+	Password    string
+	Status      interface{}
+	LastLoginAt sql.NullTime
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }

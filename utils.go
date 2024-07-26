@@ -12,7 +12,7 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-func env(key, fallback string) string {
+func getenv(key, fallback string) string {
 	if val, hasVal := os.LookupEnv(key); hasVal {
 		return val
 	}

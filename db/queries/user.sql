@@ -2,7 +2,7 @@
 INSERT INTO users (id, email, first_name, last_name, password) VALUES (?, ?, ?, ?, ?) RETURNING *;
 
 -- name: VerifyUserById :exec
-UPDATE users SET email_verified = ?, status = "active" WHERE id = ?;
+UPDATE users SET status = "active" WHERE id = ?;
 
 -- name: DeactivateUser :exec
 UPDATE users SET status = "inactive" WHERE id = ?;

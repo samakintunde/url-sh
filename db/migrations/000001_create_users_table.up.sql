@@ -4,7 +4,6 @@ CREATE TABLE users (
     first_name TEXT,
     last_name TEXT,
     password TEXT NOT NULL,
-    email_verified BOOLEAN NOT NULL DEFAULT FALSE,
     status TEXT NOT NULL DEFAULT "pending" CHECK (status IN ('pending', 'active', 'suspended', 'deleted')),
     last_login_at TIMESTAMP,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

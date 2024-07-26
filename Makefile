@@ -17,7 +17,7 @@ build:
 	$(MAKE) build-server
 
 dev-server:
-	air
+	DEBUG=true air
 
 dev-web:
 	yarn --cwd web dev
@@ -33,9 +33,10 @@ clean-web:
 
 clean-server:
 	go clean
-	rm bin/${BINARY_NAME}-darwin
-	rm bin/${BINARY_NAME}-linux
-	rm bin/${BINARY_NAME}-windows
+	rm -f bin/${BINARY_NAME}-darwin
+	rm -f bin/${BINARY_NAME}-linux
+	rm -f bin/${BINARY_NAME}-windows
+	rm -f tmp/main
 
 clean:
 	$(MAKE) clean-web & $(MAKE) clean-server

@@ -22,7 +22,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	if err := run(ctx, env); err != nil {
+	if err := run(ctx, getenv); err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err)
 		os.Exit(1)
 	}
@@ -34,16 +34,24 @@ var interruptSignals = []os.Signal{
 	syscall.SIGINT,
 }
 
-func run(ctx context.Context, env func(string, string) string) error {
+func run(ctx context.Context, getenv func(string, string) string) error {
+
 	ctx, stop := signal.NotifyContext(ctx, interruptSignals...)
 
 	defer stop()
+
+	config, err := LoadEnvFile()
+
+	if err != nil {
+		return err
+	}
+
+	slog.Info("run mode:", "Debug", config.Debug)
 
 	validate := InitValidator()
 	ut := InitUniversalTranslator(validate)
 	trans := InitTranslator(validate, ut)
 
-	config := InitConfig(env)
 	sqliteDB, err := initDB(config)
 
 	if err != nil {
@@ -62,8 +70,15 @@ func run(ctx context.Context, env func(string, string) string) error {
 
 	queries := db.New(sqliteDB)
 
+	var email Emailer
+	if config.Debug {
+		email = NewMockEmailService()
+	} else {
+		email = NewEmailService(emailSMTPConfig(config.SMTP))
+	}
+
 	fs := web.InitWebServer()
-	srv := NewServer(ctx, fs, queries, validate, ut, trans)
+	srv := NewServer(ctx, fs, queries, validate, ut, trans, email)
 
 	httpServer := &http.Server{
 		Addr:         config.HttpAddr,

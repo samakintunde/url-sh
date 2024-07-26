@@ -11,10 +11,11 @@ INSERT INTO email_verifications (
 -- name: GetEmailVerification :one
 SELECT id, code, expires_at, verified_at FROM email_verifications WHERE user_id = ? AND email = ?;
 
--- name: CompleteEmailVerification :exec
+-- name: CompleteEmailVerification :one
 UPDATE email_verifications
 SET verified_at = CURRENT_TIMESTAMP
-WHERE code = ? AND expires_at > CURRENT_TIMESTAMP;
+WHERE user_id = ? AND email = ? AND code = ? AND expires_at > CURRENT_TIMESTAMP
+RETURNING *;
 
 -- name: CleanExpiredEmailVerifications :exec
 DELETE FROM email_verifications

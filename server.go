@@ -9,8 +9,8 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
-func NewServer(ctx context.Context, fs http.Handler, queries *db.Queries, validate *validator.Validate, ut *ut.UniversalTranslator, trans ut.Translator) http.Handler {
+func NewServer(ctx context.Context, fs http.Handler, queries *db.Queries, validate *validator.Validate, ut *ut.UniversalTranslator, trans ut.Translator, email Emailer) http.Handler {
 	mux := http.NewServeMux()
-	routes(ctx, mux, fs, queries, validate, ut, trans)
+	routes(ctx, mux, fs, queries, validate, ut, trans, email)
 	return mux
 }

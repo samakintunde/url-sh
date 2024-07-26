@@ -31,7 +31,8 @@ make dev
 - [x] Connect DB
 - [] Backend
   - [] Logs
-    - Obscure sensitive details from logs
+    - [] Improve logging with tracing
+    - [] Obscure sensitive details from logs
   - [] Auth
     - [] Simplify validation logic
     - [] Register

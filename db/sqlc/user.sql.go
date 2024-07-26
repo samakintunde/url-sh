@@ -11,7 +11,7 @@ import (
 )
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (id, email, first_name, last_name, password) VALUES (?, ?, ?, ?, ?) RETURNING id, email, first_name, last_name, password, email_verified, status, last_login_at, created_at, updated_at
+INSERT INTO users (id, email, first_name, last_name, password) VALUES (?, ?, ?, ?, ?) RETURNING id, email, first_name, last_name, password, status, last_login_at, created_at, updated_at
 `
 
 type CreateUserParams struct {
@@ -37,7 +37,6 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.FirstName,
 		&i.LastName,
 		&i.Password,
-		&i.EmailVerified,
 		&i.Status,
 		&i.LastLoginAt,
 		&i.CreatedAt,
@@ -87,7 +86,7 @@ func (q *Queries) DoesUserExistByEmail(ctx context.Context, email string) (int64
 }
 
 const getUser = `-- name: GetUser :one
-SELECT id, email, first_name, last_name, password, email_verified, status, last_login_at, created_at, updated_at FROM users WHERE id = ? LIMIT 1
+SELECT id, email, first_name, last_name, password, status, last_login_at, created_at, updated_at FROM users WHERE id = ? LIMIT 1
 `
 
 func (q *Queries) GetUser(ctx context.Context, id string) (User, error) {
@@ -99,7 +98,6 @@ func (q *Queries) GetUser(ctx context.Context, id string) (User, error) {
 		&i.FirstName,
 		&i.LastName,
 		&i.Password,
-		&i.EmailVerified,
 		&i.Status,
 		&i.LastLoginAt,
 		&i.CreatedAt,
@@ -109,7 +107,7 @@ func (q *Queries) GetUser(ctx context.Context, id string) (User, error) {
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, first_name, last_name, password, email_verified, status, last_login_at, created_at, updated_at FROM users WHERE email = ? LIMIT 1
+SELECT id, email, first_name, last_name, password, status, last_login_at, created_at, updated_at FROM users WHERE email = ? LIMIT 1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -121,7 +119,6 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.FirstName,
 		&i.LastName,
 		&i.Password,
-		&i.EmailVerified,
 		&i.Status,
 		&i.LastLoginAt,
 		&i.CreatedAt,
@@ -131,15 +128,10 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 }
 
 const verifyUserById = `-- name: VerifyUserById :exec
-UPDATE users SET email_verified = ?, status = "active" WHERE id = ?
+UPDATE users SET status = "active" WHERE id = ?
 `
 
-type VerifyUserByIdParams struct {
-	EmailVerified bool
-	ID            string
-}
-
-func (q *Queries) VerifyUserById(ctx context.Context, arg VerifyUserByIdParams) error {
-	_, err := q.db.ExecContext(ctx, verifyUserById, arg.EmailVerified, arg.ID)
+func (q *Queries) VerifyUserById(ctx context.Context, id string) error {
+	_, err := q.db.ExecContext(ctx, verifyUserById, id)
 	return err
 }
