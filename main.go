@@ -39,7 +39,7 @@ func run(ctx context.Context, env func(string, string) string) error {
 	defer stop()
 
 	config := InitConfig(env)
-	fs := web.InitWebServer()
+	fs := InitWebServer()
 	srv := NewServer(fs)
 	db, err := initDB(config)
 
