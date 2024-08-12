@@ -1,4 +1,4 @@
-package web
+package main
 
 import (
 	"embed"
@@ -7,13 +7,13 @@ import (
 	"net/http"
 )
 
-//go:embed dist/*
+//go:embed web/dist/*
 var resources embed.FS
 
 func InitWebServer() http.Handler {
-	dist, err := fs.Sub(resources, "dist")
+	dist, err := fs.Sub(resources, "web/dist")
 	if err != nil {
-		slog.Error("couldn't open `dist` directory", err)
+		slog.Error("couldn't open `web/dist` directory", err)
 	}
 	fs := http.FileServerFS(dist)
 	return fs
