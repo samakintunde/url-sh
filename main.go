@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	db "url-shortener/db/sqlc"
 	"url-shortener/web"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -39,23 +40,26 @@ func run(ctx context.Context, env func(string, string) string) error {
 	defer stop()
 
 	config := InitConfig(env)
-	fs := InitWebServer()
-	srv := NewServer(fs)
-	db, err := initDB(config)
+	sqliteDB, err := initDB(config)
 
 	if err != nil {
 		slog.Error("couldn't init db", err)
 		return err
 	}
 
-	defer db.Close()
+	defer sqliteDB.Close()
 
-	err = runMigration(db, config)
+	err = runMigration(sqliteDB, config)
 
 	if err != nil {
 		slog.Error("couldn't run migrations", err)
 		return err
 	}
+
+	_ = db.New(sqliteDB)
+
+	fs := web.InitWebServer()
+	srv := NewServer(fs)
 
 	httpServer := &http.Server{
 		Addr:         config.HttpAddr,
