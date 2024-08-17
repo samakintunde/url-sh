@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 	db "url-shortener/db/sqlc"
+	"url-shortener/internal/config"
 	"url-shortener/web"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -40,19 +41,19 @@ func run(ctx context.Context, getenv func(string, string) string) error {
 
 	defer stop()
 
-	config, err := LoadEnvFile()
+	cfg, err := config.Load()
 
 	if err != nil {
 		return err
 	}
 
-	slog.Info("run mode:", "Debug", config.Debug)
+	slog.Info("run mode:", "Debug", cfg.Debug)
 
 	validate := InitValidator()
 	ut := InitUniversalTranslator(validate)
 	trans := InitTranslator(validate, ut)
 
-	sqliteDB, err := initDB(config)
+	sqliteDB, err := initDB(cfg.Database)
 
 	if err != nil {
 		slog.Error("couldn't init db", err)
@@ -61,7 +62,7 @@ func run(ctx context.Context, getenv func(string, string) string) error {
 
 	defer sqliteDB.Close()
 
-	err = runMigration(sqliteDB, config)
+	err = runMigration(sqliteDB, cfg.Database)
 
 	if err != nil {
 		slog.Error("couldn't run migrations", err)
@@ -71,17 +72,17 @@ func run(ctx context.Context, getenv func(string, string) string) error {
 	queries := db.New(sqliteDB)
 
 	var email Emailer
-	if config.Debug {
+	if cfg.Debug {
 		email = NewMockEmailService()
 	} else {
-		email = NewEmailService(emailSMTPConfig(config.SMTP))
+		email = NewEmailService(emailSMTPConfig(cfg.SMTP))
 	}
 
 	fs := web.InitWebServer()
 	srv := NewServer(ctx, fs, queries, validate, ut, trans, email)
 
 	httpServer := &http.Server{
-		Addr:         config.HttpAddr,
+		Addr:         cfg.Server.Address,
 		Handler:      srv,
 		ReadTimeout:  2 * time.Second,
 		WriteTimeout: 2 * time.Second,
@@ -112,8 +113,8 @@ func run(ctx context.Context, getenv func(string, string) string) error {
 	return nil
 }
 
-func initDB(cfg Config) (*sql.DB, error) {
-	db, err := sql.Open("sqlite3", cfg.DatabaseUri)
+func initDB(cfg config.Database) (*sql.DB, error) {
+	db, err := sql.Open("sqlite3", cfg.Uri)
 	if err != nil {
 		return nil, err
 	}
@@ -123,14 +124,14 @@ func initDB(cfg Config) (*sql.DB, error) {
 	return db, nil
 }
 
-func runMigration(db *sql.DB, config Config) error {
+func runMigration(db *sql.DB, cfg config.Database) error {
 	// Will wrap each migration in an implicit transaction by default
 	driver, err := sqlite3.WithInstance(db, &sqlite3.Config{})
 	if err != nil {
 		return err
 	}
 
-	migration, err := migrate.NewWithDatabaseInstance(config.MigrationSourceURL, "sqlite3", driver)
+	migration, err := migrate.NewWithDatabaseInstance(cfg.MigrationSourceURL, "sqlite3", driver)
 
 	if err != nil {
 		return err
