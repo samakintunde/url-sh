@@ -54,8 +54,9 @@ func initConfig(v *viper.Viper) Config {
 
 	port := v.GetInt("PORT")
 	serverConfig := Server{
-		Address: fmt.Sprintf("0.0.0.0:%d", port),
-		Port:    port,
+		Address:           fmt.Sprintf("0.0.0.0:%d", port),
+		Port:              port,
+		TokenSymmetricKey: v.GetString("TOKEN_SYMMETRIC_KEY"),
 	}
 
 	var logLevel string
