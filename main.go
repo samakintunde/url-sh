@@ -12,6 +12,10 @@ import (
 	"time"
 	db "url-shortener/db/sqlc"
 	"url-shortener/internal/config"
+	"url-shortener/internal/email"
+	"url-shortener/internal/server"
+	"url-shortener/internal/token"
+	"url-shortener/internal/utils"
 	"url-shortener/web"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -23,7 +27,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	if err := run(ctx, getenv); err != nil {
+	if err := run(ctx, config.GetEnv); err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err)
 		os.Exit(1)
 	}
@@ -49,9 +53,9 @@ func run(ctx context.Context, getenv func(string, string) string) error {
 
 	slog.Info("run mode:", "Debug", cfg.Debug)
 
-	validate := InitValidator()
-	ut := InitUniversalTranslator(validate)
-	trans := InitTranslator(validate, ut)
+	validate := utils.InitValidator()
+	ut := utils.InitUniversalTranslator(validate)
+	trans := utils.InitTranslator(validate, ut)
 
 	sqliteDB, err := initDB(cfg.Database)
 
@@ -71,15 +75,23 @@ func run(ctx context.Context, getenv func(string, string) string) error {
 
 	queries := db.New(sqliteDB)
 
-	var email Emailer
+	var emailer email.Emailer
 	if cfg.Debug {
-		email = NewMockEmailService()
+		emailer = email.NewMockEmailService()
 	} else {
-		email = NewEmailService(emailSMTPConfig(cfg.SMTP))
+		emailer = email.NewEmailService(email.EmailSMTPConfig(cfg.SMTP))
 	}
 
 	fs := web.InitWebServer()
-	srv := NewServer(ctx, fs, queries, validate, ut, trans, email)
+
+	tokenMaker, err := token.NewPasetoMaker(cfg.Server.TokenSymmetricKey)
+
+	if err != nil {
+		slog.Error("couldn't create token maker", err)
+		return err
+	}
+
+	srv := server.New(ctx, fs, queries, validate, ut, trans, emailer, tokenMaker)
 
 	httpServer := &http.Server{
 		Addr:         cfg.Server.Address,
