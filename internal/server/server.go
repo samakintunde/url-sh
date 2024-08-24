@@ -9,18 +9,16 @@ import (
 	emailverification "url-shortener/internal/email_verification"
 	"url-shortener/internal/token"
 	"url-shortener/internal/user"
-
-	ut "github.com/go-playground/universal-translator"
-	"github.com/go-playground/validator/v10"
+	"url-shortener/internal/validation"
 )
 
-func New(ctx context.Context, fs http.Handler, queries *db.Queries, validate *validator.Validate, ut *ut.UniversalTranslator, trans ut.Translator, emailer email.Emailer, tokenMaker token.Maker) http.Handler {
+func New(ctx context.Context, fs http.Handler, queries *db.Queries, validator validation.Validator, emailer email.Emailer, tokenMaker token.Maker) http.Handler {
 	mux := http.NewServeMux()
 
-	userService := user.NewUserService(queries)
+	userService := user.NewUserService(queries, tokenMaker)
 	authService := auth.NewAuthService(queries)
 	emailVerificationService := emailverification.NewEmailVerificationService(queries, emailer)
 
-	routes(ctx, mux, fs, validate, ut, trans, emailer, tokenMaker, userService, authService, emailVerificationService)
+	routes(ctx, mux, fs, validator, emailer, tokenMaker, userService, authService, emailVerificationService)
 	return mux
 }

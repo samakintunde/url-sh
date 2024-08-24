@@ -67,6 +67,74 @@ func (e *EmailVerificationService) CreateEmailVerification(ctx context.Context, 
 	return nil
 }
 
+type RecreateEmailVerificationParams CreateEmailVerificationParams
+
+func (e *EmailVerificationService) RecreateEmailVerification(ctx context.Context, args CreateEmailVerificationParams) (db.GetEmailVerificationRow, error) {
+	serviceID := "service.email_verification.RereateEmailVerification"
+
+	code, err := utils.GenerateAlphanum(8)
+
+	if err != nil {
+		slog.Error(serviceID, "message", utils.ErrGeneratingToken, "error", err)
+		return db.GetEmailVerificationRow{}, utils.ErrGeneratingToken
+	}
+
+	emailVerification, err := e.queries.GetEmailVerification(ctx, db.GetEmailVerificationParams{
+		UserID: args.UserID,
+		Email:  args.UserEmail,
+	})
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			slog.Info(serviceID, "message", "no email verification found", "error", err, "email", args.UserEmail)
+		} else {
+			return db.GetEmailVerificationRow{}, err
+		}
+	}
+
+	if emailVerification.ExpiresAt.After(time.Now()) {
+		recreatedEmailVerification, err := e.queries.RecreateEmailVerification(ctx, db.RecreateEmailVerificationParams{
+			Code:      emailVerification.Code,
+			ExpiresAt: time.Now().Add(time.Minute * 15),
+			UserID:    emailVerification.UserID,
+			Email:     emailVerification.Email,
+		})
+		if err != nil {
+			slog.Error(serviceID, "message", ErrRecreatingEmailVerification, "error", err)
+			return db.GetEmailVerificationRow{}, ErrCreatingEmailVerification
+
+		}
+		return db.GetEmailVerificationRow(recreatedEmailVerification), nil
+	} else {
+		e.queries.CleanExpiredEmailVerificationsForUserID(ctx, emailVerification.UserID)
+	}
+
+	emailVerificationParam := db.CreateEmailVerificationParams{
+		UserID:    args.UserID,
+		Email:     args.UserEmail,
+		Code:      code,
+		ExpiresAt: time.Now().Add(time.Minute * 15),
+	}
+
+	err = e.queries.CreateEmailVerification(ctx, emailVerificationParam)
+
+	if err != nil {
+		slog.Error(serviceID, "message", ErrCreatingEmailVerification, "error", err)
+		return db.GetEmailVerificationRow{}, ErrCreatingEmailVerification
+	}
+
+	slog.Info(serviceID, "message", "created email verification", "email", args.UserEmail, "code", code)
+
+	err = e.emailer.Send([]string{args.UserEmail}, "Verify your Account", fmt.Sprintf("Your verification code is: %s", code))
+
+	if err != nil {
+		slog.Error(serviceID, "message", "couldn't send email verification", "error", err)
+		return db.GetEmailVerificationRow{}, email.ErrSendingEmail
+	}
+
+	return emailVerification, nil
+}
+
 type HasUserCompletedEmailVerificationParams struct {
 	UserID, UserEmail string
 }
@@ -86,7 +154,7 @@ func (e *EmailVerificationService) HasUserCompletedEmailVerification(ctx context
 
 	if hasCompletedVerification == 1 {
 		slog.Info(serviceID, "message", "email already verified")
-		return true, ErrEmailVerificationCompleted
+		return true, nil
 	}
 
 	return false, nil

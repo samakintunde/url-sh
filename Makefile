@@ -15,6 +15,7 @@ help:
 	@echo "  make server                     - Build server"
 	@echo
 	@echo "Run Development server"
+	@echo "  make dev                        - Run server with Air and web with Vite"
 	@echo "  make dev-server                 - Run server dev server with Air"
 	@echo "  make dev-web                    - Run web dev server with Vite"
 	@echo
@@ -27,6 +28,9 @@ help:
 	@echo "  make web-deps                   - Install web app dependencies (yarn install the universe)"
 	@echo "  make web-lint                   - Run eslint and typecheck on the web app"
 	@echo "  make web-fmt                    - Run prettier on the web app"
+	@echo
+	@echo "SQLC"
+	@echo "  make sqlc                       - Generates SQLC queries"
 	@echo
 	@echo "Test/check:"
 	@echo "  make test                       - Run tests"
@@ -59,7 +63,7 @@ darwin-server:
 # Development
 dev: dev-web dev-server
 
-dev-server:
+dev-server: web-build
 	DEBUG=true air
 
 dev-web:

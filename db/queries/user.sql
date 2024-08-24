@@ -21,3 +21,9 @@ SELECT * FROM users WHERE id = ? LIMIT 1;
 
 -- name: DoesUserExist :one
 SELECT EXISTS(SELECT 1 FROM users WHERE id = ?);
+
+-- name: UpdateUserPassword :exec
+UPDATE users SET password = ? WHERE id = ?;
+
+-- name: UpdateUserLoginTime :exec
+UPDATE users SET last_login_at = ? WHERE id = ?;

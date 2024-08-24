@@ -4,20 +4,24 @@ import (
 	"context"
 	"database/sql"
 	"log/slog"
+	"time"
 	db "url-shortener/db/sqlc"
 	"url-shortener/internal/auth"
+	"url-shortener/internal/token"
 	"url-shortener/internal/utils"
 
 	"github.com/mattn/go-sqlite3"
 )
 
 type UserService struct {
-	queries *db.Queries
+	queries    *db.Queries
+	tokenMaker token.Maker
 }
 
-func NewUserService(queries *db.Queries) *UserService {
+func NewUserService(queries *db.Queries, tokenMaker token.Maker) *UserService {
 	return &UserService{
-		queries: queries,
+		queries:    queries,
+		tokenMaker: tokenMaker,
 	}
 }
 
@@ -122,4 +126,164 @@ func (u *UserService) GetUserByEmail(ctx context.Context, args GetUserByEmailPar
 	}
 
 	return user, nil
+}
+
+type UpdateLoginTimeParams struct {
+	ID   string
+	Time time.Time
+}
+
+func (u *UserService) UpdateLastLogin(ctx context.Context, args UpdateLoginTimeParams) error {
+	serviceID := "service.user.UpdateLastLogin"
+
+	err := u.queries.UpdateUserLoginTime(ctx, db.UpdateUserLoginTimeParams{
+		ID: args.ID,
+		LastLoginAt: sql.NullTime{
+			Time:  args.Time,
+			Valid: !args.Time.IsZero(),
+		},
+	})
+
+	if err != nil {
+		slog.Error(serviceID, "message", "database error updating user login time", "error", err)
+	}
+
+	return err
+}
+
+type StartPasswordResetParams struct {
+	Email string
+}
+
+func (u *UserService) StartPasswordReset(ctx context.Context, args StartPasswordResetParams) (db.PasswordResetToken, error) {
+	serviceID := "service.user.StartPasswordReset"
+
+	user, err := u.queries.GetUserByEmail(ctx, args.Email)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			slog.Error(serviceID, "message", "user not found", "email", args.Email, "error", err)
+			return db.PasswordResetToken{}, ErrUserNotFound
+		}
+		slog.Error(serviceID, "message", "database error querying existing user", "error", err)
+		return db.PasswordResetToken{}, err
+	}
+
+	existingPasswordResetToken, err := u.queries.GetPasswordResetTokenByUserID(ctx, user.ID)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			slog.Error(serviceID, "message", "no valid password reset found", "email", args.Email, "error", err)
+		} else {
+			slog.Error(serviceID, "message", "database error querying existing password token", "error", err)
+			return db.PasswordResetToken{}, ErrUnknownError
+		}
+	}
+
+	if existingPasswordResetToken.Token != "" && existingPasswordResetToken.ExpiresAt.After(time.Now()) {
+		return existingPasswordResetToken, nil
+	}
+
+	token, claims, err := u.tokenMaker.CreateToken(user.ID, 1*time.Hour)
+
+	if err != nil {
+		slog.Error(serviceID, "message", "couldn't create token", "email", args.Email, "error", err)
+		return db.PasswordResetToken{}, ErrUnknownError
+	}
+
+	createPasswordResetParams := db.CreatePasswordResetTokenParams{
+		UserID:    user.ID,
+		Token:     token,
+		ExpiresAt: claims.ExpiresAt,
+	}
+
+	passwordResetToken, err := u.queries.CreatePasswordResetToken(ctx, createPasswordResetParams)
+
+	if err != nil {
+		slog.Error(serviceID, "message", "couldn't create start password reset", "email", args.Email, "error", err)
+		return db.PasswordResetToken{}, err
+	}
+
+	return passwordResetToken, nil
+}
+
+type ResetPasswordParams struct {
+	Token    string
+	Password string
+}
+
+func (u *UserService) ResetPassword(ctx context.Context, args ResetPasswordParams) (db.PasswordResetToken, error) {
+	serviceID := "service.user.ResetPassword"
+
+	_, err := u.tokenMaker.VerifyToken(args.Token)
+
+	if err != nil {
+		return db.PasswordResetToken{}, err
+	}
+
+	passwordResetToken, err := u.queries.GetPasswordResetToken(ctx, args.Token)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			slog.Error(serviceID, "message", "password reset not started", "user", passwordResetToken.UserID, "error", err)
+			return db.PasswordResetToken{}, ErrUserNotFound
+		}
+		slog.Error(serviceID, "message", "couldn't get password reset token", "user", passwordResetToken.UserID, "error", err)
+		return db.PasswordResetToken{}, err
+	}
+
+	isPasswordStrong := auth.CheckPasswordStrength(args.Password)
+
+	if !isPasswordStrong {
+		slog.Info(serviceID, "error", ErrPasswordWeak)
+		return db.PasswordResetToken{}, ErrPasswordWeak
+	}
+
+	// Check if Password is being re-used or has been leaked
+	isPasswordPwned, err := auth.CheckPasswordPwned(args.Password)
+
+	if err != nil {
+		slog.Info(serviceID, "message", "couldn't check if password pwned", "user", passwordResetToken.ID, "error", err)
+		return db.PasswordResetToken{}, ErrUnknownError
+	}
+
+	if isPasswordPwned {
+		slog.Info(serviceID, "message", "password compromised in data breach", "user", passwordResetToken.ID)
+		return db.PasswordResetToken{}, ErrPasswordCompromised
+	}
+
+	hashedPassword, err := auth.HashPassword(args.Password)
+
+	if err != nil {
+		slog.Error(serviceID, "message", "couldn't hash password", "user", passwordResetToken.UserID, "error", err)
+		return db.PasswordResetToken{}, ErrHashingPassword
+	}
+
+	user, err := u.queries.GetUser(ctx, passwordResetToken.UserID)
+
+	if err != nil {
+		slog.Error(serviceID, "message", "couldn't get user", "user", passwordResetToken.UserID, "error", err)
+		return db.PasswordResetToken{}, ErrGettingUserByID
+	}
+
+	isCurrentPassword, err := auth.VerifyPassword(args.Password, user.Password)
+
+	if isCurrentPassword {
+		slog.Error(serviceID, "message", "current password being reused", "user", passwordResetToken.UserID, "error", err)
+		return db.PasswordResetToken{}, ErrReusingPassword
+	}
+
+	err = u.queries.UpdateUserPassword(ctx, db.UpdateUserPasswordParams{
+		Password: hashedPassword,
+		ID:       passwordResetToken.UserID,
+	})
+
+	if err != nil {
+		slog.Error(serviceID, "message", "couldn't update user password", "user", passwordResetToken.UserID, "error", err)
+		return db.PasswordResetToken{}, err
+	}
+
+	u.queries.DeletePasswordResetToken(ctx, passwordResetToken.Token)
+
+	return passwordResetToken, nil
 }

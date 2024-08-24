@@ -21,6 +21,16 @@ func (q *Queries) CleanExpiredEmailVerifications(ctx context.Context) error {
 	return err
 }
 
+const cleanExpiredEmailVerificationsForUserID = `-- name: CleanExpiredEmailVerificationsForUserID :exec
+DELETE FROM email_verifications
+WHERE user_id = ? AND expires_at < CURRENT_TIMESTAMP AND verified_at IS NULL
+`
+
+func (q *Queries) CleanExpiredEmailVerificationsForUserID(ctx context.Context, userID string) error {
+	_, err := q.db.ExecContext(ctx, cleanExpiredEmailVerificationsForUserID, userID)
+	return err
+}
+
 const completeEmailVerification = `-- name: CompleteEmailVerification :one
 UPDATE email_verifications
 SET verified_at = CURRENT_TIMESTAMP
@@ -78,7 +88,7 @@ func (q *Queries) CreateEmailVerification(ctx context.Context, arg CreateEmailVe
 }
 
 const getEmailVerification = `-- name: GetEmailVerification :one
-SELECT id, code, expires_at, verified_at FROM email_verifications WHERE user_id = ? AND email = ?
+SELECT id, user_id, email, code, expires_at, verified_at FROM email_verifications WHERE user_id = ? AND email = ?
 `
 
 type GetEmailVerificationParams struct {
@@ -88,6 +98,8 @@ type GetEmailVerificationParams struct {
 
 type GetEmailVerificationRow struct {
 	ID         int64
+	UserID     string
+	Email      string
 	Code       string
 	ExpiresAt  time.Time
 	VerifiedAt sql.NullTime
@@ -98,6 +110,8 @@ func (q *Queries) GetEmailVerification(ctx context.Context, arg GetEmailVerifica
 	var i GetEmailVerificationRow
 	err := row.Scan(
 		&i.ID,
+		&i.UserID,
+		&i.Email,
 		&i.Code,
 		&i.ExpiresAt,
 		&i.VerifiedAt,
@@ -165,10 +179,11 @@ func (q *Queries) IsUserEmailVerificationComplete(ctx context.Context, arg IsUse
 	return is_verified, err
 }
 
-const recreateEmailVerification = `-- name: RecreateEmailVerification :exec
+const recreateEmailVerification = `-- name: RecreateEmailVerification :one
 UPDATE email_verifications
 SET code = ?, expires_at = ?, created_at = CURRENT_TIMESTAMP
 WHERE user_id = ? AND email = ? AND verified_at IS NULL
+RETURNING id, user_id, email, code, expires_at, verified_at
 `
 
 type RecreateEmailVerificationParams struct {
@@ -178,12 +193,30 @@ type RecreateEmailVerificationParams struct {
 	Email     string
 }
 
-func (q *Queries) RecreateEmailVerification(ctx context.Context, arg RecreateEmailVerificationParams) error {
-	_, err := q.db.ExecContext(ctx, recreateEmailVerification,
+type RecreateEmailVerificationRow struct {
+	ID         int64
+	UserID     string
+	Email      string
+	Code       string
+	ExpiresAt  time.Time
+	VerifiedAt sql.NullTime
+}
+
+func (q *Queries) RecreateEmailVerification(ctx context.Context, arg RecreateEmailVerificationParams) (RecreateEmailVerificationRow, error) {
+	row := q.db.QueryRowContext(ctx, recreateEmailVerification,
 		arg.Code,
 		arg.ExpiresAt,
 		arg.UserID,
 		arg.Email,
 	)
-	return err
+	var i RecreateEmailVerificationRow
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Email,
+		&i.Code,
+		&i.ExpiresAt,
+		&i.VerifiedAt,
+	)
+	return i, err
 }

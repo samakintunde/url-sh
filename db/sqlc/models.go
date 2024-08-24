@@ -19,16 +19,12 @@ type EmailVerification struct {
 	VerifiedAt sql.NullTime
 }
 
-type Session struct {
-	ID           string
-	Email        string
-	RefreshToken string
-	UserAgent    string
-	ClientIp     string
-	IsBlocked    bool
-	ExpiresAt    time.Time
-	CreatedAt    time.Time
-	FOREIGN      interface{}
+type PasswordResetToken struct {
+	ID        int64
+	UserID    string
+	Token     string
+	ExpiresAt time.Time
+	CreatedAt time.Time
 }
 
 type User struct {

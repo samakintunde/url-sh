@@ -52,6 +52,13 @@ func HashPassword(password string) (string, error) {
 	return encodedHash, nil
 }
 
+func dummyHashedPassword() string {
+	return fmt.Sprintf("$argon2id$v=%d$m=%d,t=%d,p=%d$%s$%s",
+		argon2.Version, argonParams.memory, argonParams.iterations, argonParams.parallelism,
+		base64.RawStdEncoding.EncodeToString([]byte{}),
+		base64.RawStdEncoding.EncodeToString([]byte{}))
+}
+
 func VerifyPassword(password, encodedHash string) (bool, error) {
 	parts := strings.Split(encodedHash, "$")
 	if len(parts) != 6 {

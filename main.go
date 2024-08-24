@@ -15,7 +15,7 @@ import (
 	"url-shortener/internal/email"
 	"url-shortener/internal/server"
 	"url-shortener/internal/token"
-	"url-shortener/internal/utils"
+	"url-shortener/internal/validation"
 	"url-shortener/web"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -53,10 +53,6 @@ func run(ctx context.Context, getenv func(string, string) string) error {
 
 	slog.Info("run mode:", "Debug", cfg.Debug)
 
-	validate := utils.InitValidator()
-	ut := utils.InitUniversalTranslator(validate)
-	trans := utils.InitTranslator(validate, ut)
-
 	sqliteDB, err := initDB(cfg.Database)
 
 	if err != nil {
@@ -91,7 +87,9 @@ func run(ctx context.Context, getenv func(string, string) string) error {
 		return err
 	}
 
-	srv := server.New(ctx, fs, queries, validate, ut, trans, emailer, tokenMaker)
+	validator := validation.NewValidationService()
+
+	srv := server.New(ctx, fs, queries, validator, emailer, tokenMaker)
 
 	httpServer := &http.Server{
 		Addr:         cfg.Server.Address,

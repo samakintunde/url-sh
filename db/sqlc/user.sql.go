@@ -127,6 +127,34 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 	return i, err
 }
 
+const updateUserLoginTime = `-- name: UpdateUserLoginTime :exec
+UPDATE users SET last_login_at = ? WHERE id = ?
+`
+
+type UpdateUserLoginTimeParams struct {
+	LastLoginAt sql.NullTime
+	ID          string
+}
+
+func (q *Queries) UpdateUserLoginTime(ctx context.Context, arg UpdateUserLoginTimeParams) error {
+	_, err := q.db.ExecContext(ctx, updateUserLoginTime, arg.LastLoginAt, arg.ID)
+	return err
+}
+
+const updateUserPassword = `-- name: UpdateUserPassword :exec
+UPDATE users SET password = ? WHERE id = ?
+`
+
+type UpdateUserPasswordParams struct {
+	Password string
+	ID       string
+}
+
+func (q *Queries) UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error {
+	_, err := q.db.ExecContext(ctx, updateUserPassword, arg.Password, arg.ID)
+	return err
+}
+
 const verifyUserById = `-- name: VerifyUserById :exec
 UPDATE users SET status = "active" WHERE id = ?
 `
