@@ -14,7 +14,6 @@ import (
 	"url-shortener/internal/config"
 	"url-shortener/internal/server"
 	"url-shortener/internal/token"
-	"url-shortener/web"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/sqlite3"
@@ -70,7 +69,7 @@ func run(ctx context.Context, cfg config.Config) error {
 
 	queries := db.New(sqliteDB)
 
-	fs := web.InitWebServer()
+	fs := InitWebServer()
 
 	tokenMaker, err := token.NewPasetoMaker(cfg.Server.TokenSymmetricKey)
 

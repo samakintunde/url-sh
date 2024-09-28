@@ -90,6 +90,9 @@ web-lint:
 web-fmt:
 	yarn --cwd web format
 
+fmt:
+	go fmt
+
 vet:
 	go vet ./...
 	sqlc vet
