@@ -5,14 +5,18 @@ import (
 	"strconv"
 )
 
-func GetEnv[T any](key string, fallback T) T {
+func GetEnv(key string, fallback any) any {
 	if value, exists := os.LookupEnv(key); exists {
 		switch any(value).(type) {
 		case string:
-			return any(value).(T)
+			return value
 		case int:
 			if valueAsInt, err := strconv.Atoi(value); err == nil {
-				return any(valueAsInt).(T)
+				return valueAsInt
+			}
+		case bool:
+			if valueAsBool, err := strconv.ParseBool(value); err == nil {
+				return valueAsBool
 			}
 		default:
 			return fallback

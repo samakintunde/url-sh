@@ -12,10 +12,8 @@ import (
 	"time"
 	db "url-shortener/db/sqlc"
 	"url-shortener/internal/config"
-	"url-shortener/internal/email"
 	"url-shortener/internal/server"
 	"url-shortener/internal/token"
-	"url-shortener/internal/validation"
 	"url-shortener/web"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -27,7 +25,15 @@ import (
 func main() {
 	ctx := context.Background()
 
-	if err := run(ctx, config.GetEnv); err != nil {
+	cfg, err := config.Load()
+
+	if err != nil {
+		fmt.Printf("Error loading config: %s\n", err)
+		os.Exit(1)
+		return
+	}
+
+	if err := run(ctx, cfg); err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err)
 		os.Exit(1)
 	}
@@ -39,19 +45,12 @@ var interruptSignals = []os.Signal{
 	syscall.SIGINT,
 }
 
-func run(ctx context.Context, getenv func(string, string) string) error {
-
+func run(ctx context.Context, cfg config.Config) error {
 	ctx, stop := signal.NotifyContext(ctx, interruptSignals...)
 
 	defer stop()
 
-	cfg, err := config.Load()
-
-	if err != nil {
-		return err
-	}
-
-	slog.Info("run mode:", "Debug", cfg.Debug)
+	slog.Info("Run mode:", "Debug", cfg.Debug)
 
 	sqliteDB, err := initDB(cfg.Database)
 
@@ -71,13 +70,6 @@ func run(ctx context.Context, getenv func(string, string) string) error {
 
 	queries := db.New(sqliteDB)
 
-	var emailer email.Emailer
-	if cfg.Debug {
-		emailer = email.NewMockEmailService()
-	} else {
-		emailer = email.NewEmailService(email.EmailSMTPConfig(cfg.SMTP))
-	}
-
 	fs := web.InitWebServer()
 
 	tokenMaker, err := token.NewPasetoMaker(cfg.Server.TokenSymmetricKey)
@@ -87,9 +79,7 @@ func run(ctx context.Context, getenv func(string, string) string) error {
 		return err
 	}
 
-	validator := validation.NewValidationService()
-
-	srv := server.New(ctx, fs, queries, validator, emailer, tokenMaker)
+	srv := server.New(ctx, cfg, fs, queries, tokenMaker)
 
 	httpServer := &http.Server{
 		Addr:         cfg.Server.Address,
@@ -112,10 +102,15 @@ func run(ctx context.Context, getenv func(string, string) string) error {
 			slog.Error("error listening and serving", err)
 		}
 	case <-ctx.Done():
-		shutdownCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
+		const timeout = 1 * time.Second
+		shutdownCtx, cancel := context.WithTimeout(ctx, timeout)
 		defer cancel()
 		if err := httpServer.Shutdown(shutdownCtx); err != nil {
-			slog.Error("error shutting down server gracefully", err)
+			slog.Error(fmt.Sprintf("server failed to shut down gracefully in %v", timeout), err)
+			if err := httpServer.Close(); err != nil {
+				slog.Error("closed server immediately", err)
+				return err
+			}
 		}
 		slog.Info("server shut down")
 	}

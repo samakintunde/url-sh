@@ -19,6 +19,16 @@ type EmailVerification struct {
 	VerifiedAt sql.NullTime
 }
 
+type Link struct {
+	ID          string
+	UserID      string
+	OriginalUrl string
+	ShortUrlID  string
+	PrettyID    string
+	UpdatedAt   time.Time
+	CreatedAt   time.Time
+}
+
 type PasswordResetToken struct {
 	ID        int64
 	UserID    string

@@ -32,7 +32,6 @@ func NewValidationService() *ValidationService {
 		trans:    trans,
 	}
 }
-
 func (s *ValidationService) Validate(data any) []ValidationError {
 	err := s.validate.Struct(data)
 	if err != nil {

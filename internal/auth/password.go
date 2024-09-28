@@ -108,3 +108,21 @@ func CheckPasswordPwned(password string) (bool, error) {
 	}
 	return compromised, nil
 }
+
+func CheckPassword(password string) error {
+	isPasswordStrong := CheckPasswordStrength(password)
+	if !isPasswordStrong {
+		return ErrWeakPassword
+	}
+
+	isPasswordPwned, err := CheckPasswordPwned(password)
+	if err != nil {
+		return err
+	}
+	if isPasswordPwned {
+		return ErrCompromisedPassword
+	}
+
+	return nil
+
+}

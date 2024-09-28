@@ -13,7 +13,7 @@ import (
 
 const cleanExpiredEmailVerifications = `-- name: CleanExpiredEmailVerifications :exec
 DELETE FROM email_verifications
-WHERE expires_at < CURRENT_TIMESTAMP OR verified_at IS NOT NULL
+WHERE expires_at < CURRENT_TIMESTAMP AND verified_at IS NULL
 `
 
 func (q *Queries) CleanExpiredEmailVerifications(ctx context.Context) error {
@@ -59,7 +59,7 @@ func (q *Queries) CompleteEmailVerification(ctx context.Context, arg CompleteEma
 	return i, err
 }
 
-const createEmailVerification = `-- name: CreateEmailVerification :exec
+const createEmailVerification = `-- name: CreateEmailVerification :one
 INSERT INTO email_verifications (
     user_id,
     email,
@@ -77,18 +77,38 @@ type CreateEmailVerificationParams struct {
 	ExpiresAt time.Time
 }
 
-func (q *Queries) CreateEmailVerification(ctx context.Context, arg CreateEmailVerificationParams) error {
-	_, err := q.db.ExecContext(ctx, createEmailVerification,
+func (q *Queries) CreateEmailVerification(ctx context.Context, arg CreateEmailVerificationParams) (EmailVerification, error) {
+	row := q.db.QueryRowContext(ctx, createEmailVerification,
 		arg.UserID,
 		arg.Email,
 		arg.Code,
 		arg.ExpiresAt,
 	)
+	var i EmailVerification
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Email,
+		&i.Code,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+		&i.VerifiedAt,
+	)
+	return i, err
+}
+
+const deleteEmailVerification = `-- name: DeleteEmailVerification :exec
+DELETE FROM email_verifications
+WHERE id = ?
+`
+
+func (q *Queries) DeleteEmailVerification(ctx context.Context, id int64) error {
+	_, err := q.db.ExecContext(ctx, deleteEmailVerification, id)
 	return err
 }
 
 const getEmailVerification = `-- name: GetEmailVerification :one
-SELECT id, user_id, email, code, expires_at, verified_at FROM email_verifications WHERE user_id = ? AND email = ?
+SELECT id, user_id, email, code, created_at, expires_at, verified_at FROM email_verifications WHERE user_id = ? AND email = ? AND verified_at IS NULL
 `
 
 type GetEmailVerificationParams struct {
@@ -96,23 +116,34 @@ type GetEmailVerificationParams struct {
 	Email  string
 }
 
-type GetEmailVerificationRow struct {
-	ID         int64
-	UserID     string
-	Email      string
-	Code       string
-	ExpiresAt  time.Time
-	VerifiedAt sql.NullTime
-}
-
-func (q *Queries) GetEmailVerification(ctx context.Context, arg GetEmailVerificationParams) (GetEmailVerificationRow, error) {
+func (q *Queries) GetEmailVerification(ctx context.Context, arg GetEmailVerificationParams) (EmailVerification, error) {
 	row := q.db.QueryRowContext(ctx, getEmailVerification, arg.UserID, arg.Email)
-	var i GetEmailVerificationRow
+	var i EmailVerification
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
 		&i.Email,
 		&i.Code,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+		&i.VerifiedAt,
+	)
+	return i, err
+}
+
+const getEmailVerificationByCode = `-- name: GetEmailVerificationByCode :one
+SELECT id, user_id, email, code, created_at, expires_at, verified_at FROM email_verifications WHERE code = ? AND verified_at IS NULL
+`
+
+func (q *Queries) GetEmailVerificationByCode(ctx context.Context, code string) (EmailVerification, error) {
+	row := q.db.QueryRowContext(ctx, getEmailVerificationByCode, code)
+	var i EmailVerification
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Email,
+		&i.Code,
+		&i.CreatedAt,
 		&i.ExpiresAt,
 		&i.VerifiedAt,
 	)
@@ -120,32 +151,27 @@ func (q *Queries) GetEmailVerification(ctx context.Context, arg GetEmailVerifica
 }
 
 const getUserUnverifiedEmailVerifications = `-- name: GetUserUnverifiedEmailVerifications :many
-SELECT email, code, created_at, expires_at
-FROM email_verifications
+SELECT id, user_id, email, code, created_at, expires_at, verified_at FROM email_verifications
 WHERE user_id = ? AND verified_at IS NULL
 `
 
-type GetUserUnverifiedEmailVerificationsRow struct {
-	Email     string
-	Code      string
-	CreatedAt time.Time
-	ExpiresAt time.Time
-}
-
-func (q *Queries) GetUserUnverifiedEmailVerifications(ctx context.Context, userID string) ([]GetUserUnverifiedEmailVerificationsRow, error) {
+func (q *Queries) GetUserUnverifiedEmailVerifications(ctx context.Context, userID string) ([]EmailVerification, error) {
 	rows, err := q.db.QueryContext(ctx, getUserUnverifiedEmailVerifications, userID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []GetUserUnverifiedEmailVerificationsRow
+	var items []EmailVerification
 	for rows.Next() {
-		var i GetUserUnverifiedEmailVerificationsRow
+		var i EmailVerification
 		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
 			&i.Email,
 			&i.Code,
 			&i.CreatedAt,
 			&i.ExpiresAt,
+			&i.VerifiedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -160,61 +186,53 @@ func (q *Queries) GetUserUnverifiedEmailVerifications(ctx context.Context, userI
 	return items, nil
 }
 
-const isUserEmailVerificationComplete = `-- name: IsUserEmailVerificationComplete :one
+const isEmailVerificationComplete = `-- name: IsEmailVerificationComplete :one
 SELECT EXISTS(
     SELECT 1 FROM email_verifications
     WHERE user_id = ? AND email = ? AND verified_at IS NOT NULL
 ) AS is_verified
 `
 
-type IsUserEmailVerificationCompleteParams struct {
+type IsEmailVerificationCompleteParams struct {
 	UserID string
 	Email  string
 }
 
-func (q *Queries) IsUserEmailVerificationComplete(ctx context.Context, arg IsUserEmailVerificationCompleteParams) (int64, error) {
-	row := q.db.QueryRowContext(ctx, isUserEmailVerificationComplete, arg.UserID, arg.Email)
+func (q *Queries) IsEmailVerificationComplete(ctx context.Context, arg IsEmailVerificationCompleteParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, isEmailVerificationComplete, arg.UserID, arg.Email)
 	var is_verified int64
 	err := row.Scan(&is_verified)
 	return is_verified, err
 }
 
-const recreateEmailVerification = `-- name: RecreateEmailVerification :one
+const updateEmailVerification = `-- name: UpdateEmailVerification :one
 UPDATE email_verifications
-SET code = ?, expires_at = ?, created_at = CURRENT_TIMESTAMP
-WHERE user_id = ? AND email = ? AND verified_at IS NULL
-RETURNING id, user_id, email, code, expires_at, verified_at
+SET code = ? AND verified_at = ? AND expires_at = ?
+WHERE id = ?
+RETURNING id, user_id, email, code, created_at, expires_at, verified_at
 `
 
-type RecreateEmailVerificationParams struct {
-	Code      string
-	ExpiresAt time.Time
-	UserID    string
-	Email     string
-}
-
-type RecreateEmailVerificationRow struct {
-	ID         int64
-	UserID     string
-	Email      string
+type UpdateEmailVerificationParams struct {
 	Code       string
-	ExpiresAt  time.Time
 	VerifiedAt sql.NullTime
+	ExpiresAt  time.Time
+	ID         int64
 }
 
-func (q *Queries) RecreateEmailVerification(ctx context.Context, arg RecreateEmailVerificationParams) (RecreateEmailVerificationRow, error) {
-	row := q.db.QueryRowContext(ctx, recreateEmailVerification,
+func (q *Queries) UpdateEmailVerification(ctx context.Context, arg UpdateEmailVerificationParams) (EmailVerification, error) {
+	row := q.db.QueryRowContext(ctx, updateEmailVerification,
 		arg.Code,
+		arg.VerifiedAt,
 		arg.ExpiresAt,
-		arg.UserID,
-		arg.Email,
+		arg.ID,
 	)
-	var i RecreateEmailVerificationRow
+	var i EmailVerification
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
 		&i.Email,
 		&i.Code,
+		&i.CreatedAt,
 		&i.ExpiresAt,
 		&i.VerifiedAt,
 	)

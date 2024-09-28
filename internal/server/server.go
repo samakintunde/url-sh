@@ -5,6 +5,7 @@ import (
 	"net/http"
 	db "url-shortener/db/sqlc"
 	"url-shortener/internal/auth"
+	"url-shortener/internal/config"
 	"url-shortener/internal/email"
 	emailverification "url-shortener/internal/email_verification"
 	"url-shortener/internal/token"
@@ -12,13 +13,20 @@ import (
 	"url-shortener/internal/validation"
 )
 
-func New(ctx context.Context, fs http.Handler, queries *db.Queries, validator validation.Validator, emailer email.Emailer, tokenMaker token.Maker) http.Handler {
+func New(ctx context.Context, cfg config.Config, fs http.Handler, queries *db.Queries, tokenMaker token.Maker) http.Handler {
 	mux := http.NewServeMux()
 
-	userService := user.NewUserService(queries, tokenMaker)
+	validator := validation.NewValidationService()
+	var emailService email.Emailer
+	if cfg.Debug {
+		emailService = email.NewMockEmailService()
+	} else {
+		emailService = email.NewEmailService(email.EmailSMTPConfig(cfg.SMTP))
+	}
+	emailVerificationService := emailverification.NewEmailVerificationService(queries, emailService)
+	userService := user.NewUserService(queries, tokenMaker, emailService, emailVerificationService)
 	authService := auth.NewAuthService(queries)
-	emailVerificationService := emailverification.NewEmailVerificationService(queries, emailer)
 
-	routes(ctx, mux, fs, validator, emailer, tokenMaker, userService, authService, emailVerificationService)
+	routes(ctx, mux, fs, validator, tokenMaker, userService, authService, emailVerificationService)
 	return mux
 }
