@@ -9,14 +9,42 @@ import (
 	"time"
 )
 
+type EmailVerification struct {
+	ID         int64
+	UserID     string
+	Email      string
+	Code       string
+	CreatedAt  time.Time
+	ExpiresAt  time.Time
+	VerifiedAt sql.NullTime
+}
+
+type Link struct {
+	ID          string
+	UserID      string
+	OriginalUrl string
+	ShortUrlID  string
+	PrettyID    string
+	UpdatedAt   time.Time
+	CreatedAt   time.Time
+}
+
+type PasswordResetToken struct {
+	ID        int64
+	UserID    string
+	Token     string
+	ExpiresAt time.Time
+	CreatedAt time.Time
+}
+
 type User struct {
-	ID            string
-	Email         string
-	FirstName     sql.NullString
-	LastName      sql.NullString
-	Password      string
-	EmailVerified bool
-	Active        bool
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	ID          string
+	Email       string
+	FirstName   sql.NullString
+	LastName    sql.NullString
+	Password    string
+	Status      interface{}
+	LastLoginAt sql.NullTime
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }

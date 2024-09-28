@@ -8,11 +8,10 @@ package db
 import (
 	"context"
 	"database/sql"
-	"time"
 )
 
-const createUser = `-- name: CreateUser :exec
-INSERT INTO users (id, email, first_name, last_name, password) VALUES (?, ?, ?, ?, ?)
+const createUser = `-- name: CreateUser :one
+INSERT INTO users (id, email, first_name, last_name, password) VALUES (?, ?, ?, ?, ?) RETURNING id, email, first_name, last_name, password, status, last_login_at, created_at, updated_at
 `
 
 type CreateUserParams struct {
@@ -23,19 +22,31 @@ type CreateUserParams struct {
 	Password  string
 }
 
-func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) error {
-	_, err := q.db.ExecContext(ctx, createUser,
+func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
+	row := q.db.QueryRowContext(ctx, createUser,
 		arg.ID,
 		arg.Email,
 		arg.FirstName,
 		arg.LastName,
 		arg.Password,
 	)
-	return err
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.FirstName,
+		&i.LastName,
+		&i.Password,
+		&i.Status,
+		&i.LastLoginAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const deactivateUser = `-- name: DeactivateUser :exec
-UPDATE users SET active = false WHERE id = ?
+UPDATE users SET status = "inactive" WHERE id = ?
 `
 
 func (q *Queries) DeactivateUser(ctx context.Context, id string) error {
@@ -52,8 +63,30 @@ func (q *Queries) DeleteUser(ctx context.Context, id string) error {
 	return err
 }
 
+const doesUserExist = `-- name: DoesUserExist :one
+SELECT EXISTS(SELECT 1 FROM users WHERE id = ?)
+`
+
+func (q *Queries) DoesUserExist(ctx context.Context, id string) (int64, error) {
+	row := q.db.QueryRowContext(ctx, doesUserExist, id)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const doesUserExistByEmail = `-- name: DoesUserExistByEmail :one
+SELECT EXISTS(SELECT 1 FROM users WHERE email = ?)
+`
+
+func (q *Queries) DoesUserExistByEmail(ctx context.Context, email string) (int64, error) {
+	row := q.db.QueryRowContext(ctx, doesUserExistByEmail, email)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const getUser = `-- name: GetUser :one
-SELECT id, email, first_name, last_name, password, email_verified, active, created_at, updated_at FROM users WHERE id = ? LIMIT 1
+SELECT id, email, first_name, last_name, password, status, last_login_at, created_at, updated_at FROM users WHERE id = ? LIMIT 1
 `
 
 func (q *Queries) GetUser(ctx context.Context, id string) (User, error) {
@@ -65,8 +98,8 @@ func (q *Queries) GetUser(ctx context.Context, id string) (User, error) {
 		&i.FirstName,
 		&i.LastName,
 		&i.Password,
-		&i.EmailVerified,
-		&i.Active,
+		&i.Status,
+		&i.LastLoginAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -74,7 +107,7 @@ func (q *Queries) GetUser(ctx context.Context, id string) (User, error) {
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, first_name, last_name, password, email_verified, active, created_at, updated_at FROM users WHERE email = ? LIMIT 1
+SELECT id, email, first_name, last_name, password, status, last_login_at, created_at, updated_at FROM users WHERE email = ? LIMIT 1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -86,25 +119,47 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.FirstName,
 		&i.LastName,
 		&i.Password,
-		&i.EmailVerified,
-		&i.Active,
+		&i.Status,
+		&i.LastLoginAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return i, err
 }
 
-const verifyUserById = `-- name: VerifyUserById :exec
-UPDATE users SET email_verified = ?, updated_at = ? WHERE id = ?
+const updateUserLoginTime = `-- name: UpdateUserLoginTime :exec
+UPDATE users SET last_login_at = ? WHERE id = ?
 `
 
-type VerifyUserByIdParams struct {
-	EmailVerified bool
-	UpdatedAt     time.Time
-	ID            string
+type UpdateUserLoginTimeParams struct {
+	LastLoginAt sql.NullTime
+	ID          string
 }
 
-func (q *Queries) VerifyUserById(ctx context.Context, arg VerifyUserByIdParams) error {
-	_, err := q.db.ExecContext(ctx, verifyUserById, arg.EmailVerified, arg.UpdatedAt, arg.ID)
+func (q *Queries) UpdateUserLoginTime(ctx context.Context, arg UpdateUserLoginTimeParams) error {
+	_, err := q.db.ExecContext(ctx, updateUserLoginTime, arg.LastLoginAt, arg.ID)
+	return err
+}
+
+const updateUserPassword = `-- name: UpdateUserPassword :exec
+UPDATE users SET password = ? WHERE id = ?
+`
+
+type UpdateUserPasswordParams struct {
+	Password string
+	ID       string
+}
+
+func (q *Queries) UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error {
+	_, err := q.db.ExecContext(ctx, updateUserPassword, arg.Password, arg.ID)
+	return err
+}
+
+const verifyUserById = `-- name: VerifyUserById :exec
+UPDATE users SET status = "active" WHERE id = ?
+`
+
+func (q *Queries) VerifyUserById(ctx context.Context, id string) error {
+	_, err := q.db.ExecContext(ctx, verifyUserById, id)
 	return err
 }

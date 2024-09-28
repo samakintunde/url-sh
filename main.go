@@ -11,6 +11,9 @@ import (
 	"syscall"
 	"time"
 	db "url-shortener/db/sqlc"
+	"url-shortener/internal/config"
+	"url-shortener/internal/server"
+	"url-shortener/internal/token"
 	"url-shortener/web"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -22,7 +25,15 @@ import (
 func main() {
 	ctx := context.Background()
 
-	if err := run(ctx, env); err != nil {
+	cfg, err := config.Load()
+
+	if err != nil {
+		fmt.Printf("Error loading config: %s\n", err)
+		os.Exit(1)
+		return
+	}
+
+	if err := run(ctx, cfg); err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err)
 		os.Exit(1)
 	}
@@ -34,13 +45,14 @@ var interruptSignals = []os.Signal{
 	syscall.SIGINT,
 }
 
-func run(ctx context.Context, env func(string, string) string) error {
+func run(ctx context.Context, cfg config.Config) error {
 	ctx, stop := signal.NotifyContext(ctx, interruptSignals...)
 
 	defer stop()
 
-	config := InitConfig(env)
-	sqliteDB, err := initDB(config)
+	slog.Info("Run mode:", "Debug", cfg.Debug)
+
+	sqliteDB, err := initDB(cfg.Database)
 
 	if err != nil {
 		slog.Error("couldn't init db", err)
@@ -49,20 +61,28 @@ func run(ctx context.Context, env func(string, string) string) error {
 
 	defer sqliteDB.Close()
 
-	err = runMigration(sqliteDB, config)
+	err = runMigration(sqliteDB, cfg.Database)
 
 	if err != nil {
 		slog.Error("couldn't run migrations", err)
 		return err
 	}
 
-	_ = db.New(sqliteDB)
+	queries := db.New(sqliteDB)
 
 	fs := web.InitWebServer()
-	srv := NewServer(fs)
+
+	tokenMaker, err := token.NewPasetoMaker(cfg.Server.TokenSymmetricKey)
+
+	if err != nil {
+		slog.Error("couldn't create token maker", err)
+		return err
+	}
+
+	srv := server.New(ctx, cfg, fs, queries, tokenMaker)
 
 	httpServer := &http.Server{
-		Addr:         config.HttpAddr,
+		Addr:         cfg.Server.Address,
 		Handler:      srv,
 		ReadTimeout:  2 * time.Second,
 		WriteTimeout: 2 * time.Second,
@@ -82,10 +102,15 @@ func run(ctx context.Context, env func(string, string) string) error {
 			slog.Error("error listening and serving", err)
 		}
 	case <-ctx.Done():
-		shutdownCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
+		const timeout = 1 * time.Second
+		shutdownCtx, cancel := context.WithTimeout(ctx, timeout)
 		defer cancel()
 		if err := httpServer.Shutdown(shutdownCtx); err != nil {
-			slog.Error("error shutting down server gracefully", err)
+			slog.Error(fmt.Sprintf("server failed to shut down gracefully in %v", timeout), err)
+			if err := httpServer.Close(); err != nil {
+				slog.Error("closed server immediately", err)
+				return err
+			}
 		}
 		slog.Info("server shut down")
 	}
@@ -93,8 +118,8 @@ func run(ctx context.Context, env func(string, string) string) error {
 	return nil
 }
 
-func initDB(cfg Config) (*sql.DB, error) {
-	db, err := sql.Open("sqlite3", cfg.DatabaseUri)
+func initDB(cfg config.Database) (*sql.DB, error) {
+	db, err := sql.Open("sqlite3", cfg.Uri)
 	if err != nil {
 		return nil, err
 	}
@@ -104,14 +129,14 @@ func initDB(cfg Config) (*sql.DB, error) {
 	return db, nil
 }
 
-func runMigration(db *sql.DB, config Config) error {
+func runMigration(db *sql.DB, cfg config.Database) error {
 	// Will wrap each migration in an implicit transaction by default
 	driver, err := sqlite3.WithInstance(db, &sqlite3.Config{})
 	if err != nil {
 		return err
 	}
 
-	migration, err := migrate.NewWithDatabaseInstance(config.MigrationSourceURL, "sqlite3", driver)
+	migration, err := migrate.NewWithDatabaseInstance(cfg.MigrationSourceURL, "sqlite3", driver)
 
 	if err != nil {
 		return err
