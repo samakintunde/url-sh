@@ -72,8 +72,7 @@ func initConfig(v *viper.Viper) Config {
 	}
 
 	databaseConfig := Database{
-		Uri:                v.GetString("DATABASE_URI"),
-		MigrationSourceURL: v.GetString("MIGRATION_SOURCE_URL"),
+		Uri: v.GetString("DATABASE_URI"),
 	}
 
 	smtpConfig := SMTP{
