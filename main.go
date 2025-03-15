@@ -54,16 +54,18 @@ func run(ctx context.Context, cfg config.Config) error {
 	sqliteDB, err := initDB(cfg.Database)
 
 	if err != nil {
-		slog.Error("couldn't init db", err)
+		slog.Error("initDB", "error", err)
 		return err
 	}
 
 	defer sqliteDB.Close()
 
+	slog.Info("initialised DB")
+
 	err = runMigration(sqliteDB, cfg.Database)
 
 	if err != nil {
-		slog.Error("couldn't run migrations", err)
+		slog.Error("couldn't run migrations", "error", err)
 		return err
 	}
 
@@ -74,7 +76,7 @@ func run(ctx context.Context, cfg config.Config) error {
 	tokenMaker, err := token.NewPasetoMaker(cfg.Server.TokenSymmetricKey)
 
 	if err != nil {
-		slog.Error("couldn't create token maker", err)
+		slog.Error("couldn't create token maker", "error", err)
 		return err
 	}
 
@@ -98,16 +100,17 @@ func run(ctx context.Context, cfg config.Config) error {
 	select {
 	case err := <-serverErr:
 		if err != nil && err != http.ErrServerClosed {
-			slog.Error("error listening and serving", err)
+			slog.Error("error listening and serving", "error", err)
+			return err
 		}
 	case <-ctx.Done():
 		const timeout = 1 * time.Second
 		shutdownCtx, cancel := context.WithTimeout(ctx, timeout)
 		defer cancel()
 		if err := httpServer.Shutdown(shutdownCtx); err != nil {
-			slog.Error(fmt.Sprintf("server failed to shut down gracefully in %v", timeout), err)
+			slog.Error(fmt.Sprintf("server failed to shut down gracefully in %v", timeout), "error", err)
 			if err := httpServer.Close(); err != nil {
-				slog.Error("closed server immediately", err)
+				slog.Error("closed server immediately", "error", err)
 				return err
 			}
 		}
@@ -132,19 +135,19 @@ func runMigration(db *sql.DB, cfg config.Database) error {
 	// Will wrap each migration in an implicit transaction by default
 	driver, err := sqlite3.WithInstance(db, &sqlite3.Config{})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create sqlite3 driver: %w", err)
 	}
 
 	migration, err := migrate.NewWithDatabaseInstance(cfg.MigrationSourceURL, "sqlite3", driver)
 
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create migration instance: %w", err)
 	}
 
 	err = migration.Up()
 
 	if err != nil && err != migrate.ErrNoChange {
-		return err
+		return fmt.Errorf("failed to run migrations: %w", err)
 	}
 
 	slog.Info("migrations completed successfully")

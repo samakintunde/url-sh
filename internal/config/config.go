@@ -25,9 +25,7 @@ func Load() (Config, error) {
 
 	var envFile string
 
-	if os.Getenv("DEBUG") != "true" {
-		envFile = ".env.production"
-	} else {
+	if os.Getenv("DEBUG") == "true" {
 		envFile = ".env.local"
 	}
 
@@ -39,7 +37,7 @@ func Load() (Config, error) {
 			slog.Warn("couldn't find config file", "file", envFile, "error", err)
 			return Config{}, err
 		}
-		slog.Info("Config file not found. Using environment variables.", "file", envFile)
+		slog.Info("Config file not found. Using environment variables.")
 	}
 
 	v.AutomaticEnv()
