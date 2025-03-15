@@ -143,7 +143,7 @@ func runMigration(db *sql.DB) error {
 		return fmt.Errorf("failed to create sqlite3 driver: %w", err)
 	}
 
-	d, err := iofs.New(migrationsFS, "migrations")
+	d, err := iofs.New(migrationsFS, "db/migrations")
 	if err != nil {
 		return fmt.Errorf("Could not create ioFS driver: %v", err)
 	}
