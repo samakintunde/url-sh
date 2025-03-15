@@ -19,11 +19,12 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/sqlite3"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
 	_ "github.com/mattn/go-sqlite3"
 )
 
 //go:embed db/migrations/*.sql
-var migrationFiles embed.FS
+var migrationsFS embed.FS
 
 func main() {
 	ctx := context.Background()
@@ -66,7 +67,7 @@ func run(ctx context.Context, cfg config.Config) error {
 
 	slog.Info("initialised DB")
 
-	err = runMigration(sqliteDB, cfg.Database)
+	err = runMigration(sqliteDB)
 
 	if err != nil {
 		slog.Error("runMigration", "error", err)
@@ -135,14 +136,19 @@ func initDB(cfg config.Database) (*sql.DB, error) {
 	return db, nil
 }
 
-func runMigration(db *sql.DB, cfg config.Database) error {
+func runMigration(db *sql.DB) error {
 	// Will wrap each migration in an implicit transaction by default
 	driver, err := sqlite3.WithInstance(db, &sqlite3.Config{})
 	if err != nil {
 		return fmt.Errorf("failed to create sqlite3 driver: %w", err)
 	}
 
-	migration, err := migrate.NewWithDatabaseInstance(cfg.MigrationSourceURL, "sqlite3", driver)
+	d, err := iofs.New(migrationsFS, "migrations")
+	if err != nil {
+		return fmt.Errorf("Could not create ioFS driver: %v", err)
+	}
+
+	migration, err := migrate.NewWithInstance("iofs", d, "sqlite3", driver)
 
 	if err != nil {
 		return fmt.Errorf("failed to create migration instance: %w", err)
