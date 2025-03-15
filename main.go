@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"embed"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -20,6 +21,9 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	_ "github.com/mattn/go-sqlite3"
 )
+
+//go:embed db/migrations/*.sql
+var migrationFiles embed.FS
 
 func main() {
 	ctx := context.Background()
@@ -65,7 +69,7 @@ func run(ctx context.Context, cfg config.Config) error {
 	err = runMigration(sqliteDB, cfg.Database)
 
 	if err != nil {
-		slog.Error("couldn't run migrations", "error", err)
+		slog.Error("runMigration", "error", err)
 		return err
 	}
 
@@ -76,7 +80,7 @@ func run(ctx context.Context, cfg config.Config) error {
 	tokenMaker, err := token.NewPasetoMaker(cfg.Server.TokenSymmetricKey)
 
 	if err != nil {
-		slog.Error("couldn't create token maker", "error", err)
+		slog.Error("token.NewPasetoMaker", "error", err)
 		return err
 	}
 
@@ -100,7 +104,7 @@ func run(ctx context.Context, cfg config.Config) error {
 	select {
 	case err := <-serverErr:
 		if err != nil && err != http.ErrServerClosed {
-			slog.Error("error listening and serving", "error", err)
+			slog.Error("httpServer.ListenAndServe", "error", err)
 			return err
 		}
 	case <-ctx.Done():
@@ -110,7 +114,7 @@ func run(ctx context.Context, cfg config.Config) error {
 		if err := httpServer.Shutdown(shutdownCtx); err != nil {
 			slog.Error(fmt.Sprintf("server failed to shut down gracefully in %v", timeout), "error", err)
 			if err := httpServer.Close(); err != nil {
-				slog.Error("closed server immediately", "error", err)
+				slog.Error("httpServer.Close", "error", err)
 				return err
 			}
 		}
