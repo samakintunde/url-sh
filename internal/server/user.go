@@ -199,7 +199,7 @@ func HandleLogin(ctx context.Context, validator validation.Validator, tokenMaker
 					slog.Error(handlerID, "message", "user not found", "email", req.Email, "error", err)
 					// TODO: fix user enumeration attack
 					utils.RespondWithJSON(w, http.StatusNotFound, map[string]any{
-						"errors": []string{"Incorrect username or password"},
+						"errors": []string{"Incorrect username and/or password"},
 					})
 					return
 				}

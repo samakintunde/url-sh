@@ -113,6 +113,10 @@ func (s *UserService) LoginUser(ctx context.Context, args LoginUserParams) (User
 	user, err := s.queries.GetUserByEmail(ctx, args.Email)
 
 	if err != nil {
+		if err == sql.ErrNoRows {
+			slog.Error(serviceID, "message", "user not found", "error", err)
+			return User{}, ErrUserNotFound
+		}
 		slog.Error(serviceID, "message", "database error querying existing user", "error", err)
 		return User{}, err
 	}
