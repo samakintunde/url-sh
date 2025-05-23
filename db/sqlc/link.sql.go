@@ -43,17 +43,65 @@ func (q *Queries) CreateShortLink(ctx context.Context, arg CreateShortLinkParams
 }
 
 const deleteShortLink = `-- name: DeleteShortLink :exec
-DELETE FROM links WHERE id = ? AND user_id = ?
+DELETE FROM links WHERE user_id = ? AND id = ?
 `
 
 type DeleteShortLinkParams struct {
-	ID     string
 	UserID string
+	ID     string
 }
 
 func (q *Queries) DeleteShortLink(ctx context.Context, arg DeleteShortLinkParams) error {
-	_, err := q.db.ExecContext(ctx, deleteShortLink, arg.ID, arg.UserID)
+	_, err := q.db.ExecContext(ctx, deleteShortLink, arg.UserID, arg.ID)
 	return err
+}
+
+const getShortLinkById = `-- name: GetShortLinkById :one
+SELECT id, user_id, original_url, short_url_id, pretty_id, updated_at, created_at FROM links WHERE user_id = ? AND id = ? LIMIT 1
+`
+
+type GetShortLinkByIdParams struct {
+	UserID string
+	ID     string
+}
+
+func (q *Queries) GetShortLinkById(ctx context.Context, arg GetShortLinkByIdParams) (Link, error) {
+	row := q.db.QueryRowContext(ctx, getShortLinkById, arg.UserID, arg.ID)
+	var i Link
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.OriginalUrl,
+		&i.ShortUrlID,
+		&i.PrettyID,
+		&i.UpdatedAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getShortLinkByShortUrlId = `-- name: GetShortLinkByShortUrlId :one
+SELECT id, user_id, original_url, short_url_id, pretty_id, updated_at, created_at FROM links WHERE user_id = ? AND short_url_id = ? LIMIT 1
+`
+
+type GetShortLinkByShortUrlIdParams struct {
+	UserID     string
+	ShortUrlID string
+}
+
+func (q *Queries) GetShortLinkByShortUrlId(ctx context.Context, arg GetShortLinkByShortUrlIdParams) (Link, error) {
+	row := q.db.QueryRowContext(ctx, getShortLinkByShortUrlId, arg.UserID, arg.ShortUrlID)
+	var i Link
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.OriginalUrl,
+		&i.ShortUrlID,
+		&i.PrettyID,
+		&i.UpdatedAt,
+		&i.CreatedAt,
+	)
+	return i, err
 }
 
 const getShortLinks = `-- name: GetShortLinks :many

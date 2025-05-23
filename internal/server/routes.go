@@ -26,6 +26,13 @@ func routes(ctx context.Context, mux *http.ServeMux, fs http.Handler, validator 
 	userMux.Handle("GET /me", handleNoop())
 	userMux.Handle("GET /change-password", handleNoop())
 
+	linkMux := apiMux.Group("/links")
+	linkMux.Use(VerifyAuth(tokenMaker))
+	linkMux.Handle("GET /links", handleNoop())
+	linkMux.Handle("POST /links", HandleCreateShortLink(ctx))
+	linkMux.Handle("POST /links/pretty", handleNoop())
+	linkMux.Handle("DELETE /links/:id", handleNoop())
+
 	// OTHERS
 	mux.Handle("GET /", fs)
 	mux.HandleFunc("GET /health/", HandleHealth())

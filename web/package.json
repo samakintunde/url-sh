@@ -9,11 +9,25 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "solid-js": "^1.8.15"
+    "@corvu/otp-field": "^0.1.2",
+    "@kobalte/core": "^0.13.7",
+    "@solidjs/router": "^0.14.7",
+    "@types/node": "^22.7.4",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.1",
+    "lucide-solid": "^0.452.0",
+    "solid-js": "^1.8.15",
+    "solid-motionone": "^1.0.2",
+    "tailwind-merge": "^2.5.3",
+    "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.13",
     "typescript": "^5.2.2",
     "vite": "^5.2.0",
     "vite-plugin-solid": "^2.10.2"
-  }
+  },
+  "packageManager": "yarn@1.22.22+sha1.ac34549e6aa8e7ead463a7407e1c7390f61a6610"
 }

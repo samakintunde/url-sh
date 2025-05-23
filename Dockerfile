@@ -14,7 +14,7 @@ COPY go.mod ./
 RUN go mod download && go mod verify
 COPY . .
 COPY --from=web-builder /web/dist /usr/src/app/web/dist
-RUN go build -v -o /run-app .
+RUN GOARCH=amd64 GOOS=linux CGO_ENABLED=1 go build -v -o /run-app .
 
 
 FROM debian:bookworm
