@@ -1,4 +1,4 @@
-ARG GO_VERSION=1
+ARG GO_VERSION=1.23
 
 FROM node:alpine as web-builder
 
