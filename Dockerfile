@@ -19,8 +19,8 @@ RUN GOARCH=amd64 GOOS=linux CGO_ENABLED=1 go build -v -o /run-app .
 
 FROM debian:bookworm
 
-RUN apt update
-RUN apt install ca-certificates
+RUN apt -y update
+RUN apt -y install ca-certificates
 
 COPY --from=builder /run-app /usr/local/bin/
 CMD ["run-app"]
