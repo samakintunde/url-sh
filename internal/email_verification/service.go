@@ -81,6 +81,8 @@ func (s *EmailVerificationService) StartEmailVerification(ctx context.Context, a
 		return email.ErrSendingEmail
 	}
 
+	slog.Info("email verification sent", "email", emailVerification.Email, "code", emailVerification.Code)
+
 	return nil
 }
 

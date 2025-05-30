@@ -9,11 +9,12 @@ import (
 )
 
 type Config struct {
-	Log      Log
-	SMTP     SMTP
-	Database Database
-	Server   Server
-	Debug    bool
+	Log       Log
+	SMTP      SMTP
+	Database  Database
+	Server    Server
+	Debug     bool
+	ResendKey string
 }
 
 type EnvLoader interface {
@@ -83,11 +84,14 @@ func initConfig(v *viper.Viper) Config {
 		From:     v.GetString("SMTP_EMAIL"),
 	}
 
+	resendApiKey := v.GetString("RESEND_API_KEY")
+
 	return Config{
-		Debug:    debug,
-		Log:      logConfig,
-		SMTP:     smtpConfig,
-		Database: databaseConfig,
-		Server:   serverConfig,
+		Debug:     debug,
+		Log:       logConfig,
+		SMTP:      smtpConfig,
+		Database:  databaseConfig,
+		Server:    serverConfig,
+		ResendKey: resendApiKey,
 	}
 }

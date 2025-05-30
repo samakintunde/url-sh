@@ -21,7 +21,7 @@ func New(ctx context.Context, cfg config.Config, fs http.Handler, queries *db.Qu
 	if cfg.Debug {
 		emailService = email.NewMockEmailService()
 	} else {
-		emailService = email.NewEmailService(email.EmailSMTPConfig(cfg.SMTP))
+		emailService = email.NewResendService(email.EmailSMTPConfig(cfg.SMTP), cfg.ResendKey)
 	}
 	emailVerificationService := emailverification.NewEmailVerificationService(queries, emailService)
 	userService := user.NewUserService(queries, tokenMaker, emailService, emailVerificationService)
