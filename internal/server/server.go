@@ -18,11 +18,11 @@ func New(ctx context.Context, cfg config.Config, fs http.Handler, queries *db.Qu
 
 	validator := validation.NewValidationService()
 	var emailService email.Emailer
-	if cfg.Debug {
-		emailService = email.NewMockEmailService()
-	} else {
-		emailService = email.NewResendService(email.EmailSMTPConfig(cfg.SMTP), cfg.ResendKey)
-	}
+	// if cfg.Debug {
+	emailService = email.NewMockEmailService()
+	// } else {
+	// 	emailService = email.NewResendService(email.EmailSMTPConfig(cfg.SMTP), cfg.ResendKey)
+	// }
 	emailVerificationService := emailverification.NewEmailVerificationService(queries, emailService)
 	userService := user.NewUserService(queries, tokenMaker, emailService, emailVerificationService)
 	authService := auth.NewAuthService(queries)
