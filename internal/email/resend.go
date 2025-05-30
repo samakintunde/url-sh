@@ -26,7 +26,7 @@ func (e *ResendService) Send(to []string, subject, body string) error {
 		Html:    body,
 	}
 
-	resp, err := e.client.Emails.Send(params)
+	_, err := e.client.Emails.Send(params)
 
 	if err != nil {
 		return err
