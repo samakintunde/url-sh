@@ -14,6 +14,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.22
 	github.com/nbutton23/zxcvbn-go v0.0.0-20210217022336-fa2cb2858354
 	github.com/oklog/ulid/v2 v2.1.0
+	github.com/resend/resend-go/v2 v2.20.0
 	github.com/spf13/viper v1.19.0
 	golang.org/x/crypto v0.26.0
 )
@@ -29,7 +30,6 @@ require (
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.2 // indirect
-	github.com/resend/resend-go/v2 v2.20.0 // indirect
 	github.com/sagikazarmark/locafero v0.4.0 // indirect
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
