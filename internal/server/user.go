@@ -195,10 +195,9 @@ func HandleLogin(ctx context.Context, validator validation.Validator, tokenMaker
 			loggedInUser, err := userService.LoginUser(ctx, loginUserArgs)
 
 			if err != nil {
-				if err == user.ErrUserNotFound {
-					slog.Error(handlerID, "message", "user not found", "email", req.Email, "error", err)
-					// TODO: fix user enumeration attack
-					utils.RespondWithJSON(w, http.StatusNotFound, map[string]any{
+				if err == user.ErrInvalidCredentials {
+					slog.Error(handlerID, "message", "invalid credentials", "email", req.Email, "error", err)
+					utils.RespondWithJSON(w, http.StatusUnauthorized, map[string]any{
 						"errors": []string{"Incorrect username and/or password"},
 					})
 					return

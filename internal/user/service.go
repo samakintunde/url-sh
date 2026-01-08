@@ -115,7 +115,7 @@ func (s *UserService) LoginUser(ctx context.Context, args LoginUserParams) (User
 	if err != nil {
 		if err == sql.ErrNoRows {
 			slog.Error(serviceID, "message", "user not found", "error", err)
-			return User{}, ErrUserNotFound
+			return User{}, ErrInvalidCredentials
 		}
 		slog.Error(serviceID, "message", "database error querying existing user", "error", err)
 		return User{}, err
@@ -130,7 +130,7 @@ func (s *UserService) LoginUser(ctx context.Context, args LoginUserParams) (User
 
 	if !doPasswordsMatch {
 		slog.Error(serviceID, "message", "incorrect password")
-		return User{}, err
+		return User{}, ErrInvalidCredentials
 	}
 
 	hasCompletedEmailVerificationArgs := emailverification.IsEmailVerifiedParams{
