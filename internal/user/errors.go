@@ -13,5 +13,6 @@ var (
 	ErrInvalidVerificationToken   = errors.New("password reset token is invalid")
 	ErrInvalidPasswordResetToken  = errors.New("password reset token is invalid")
 	ErrEmailVerificationRequired  = errors.New("email_verification_required")
+	ErrInvalidCredentials         = errors.New("invalid credentials")
 	ErrUnknownError               = errors.New("something went wrong")
 )

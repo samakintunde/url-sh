@@ -13,7 +13,7 @@ var resources embed.FS
 func InitWebServer() http.Handler {
 	dist, err := fs.Sub(resources, "web/dist")
 	if err != nil {
-		slog.Error("couldn't open `web/dist` directory", err)
+		slog.Error("couldn't open `web/dist` directory", "error", err)
 	}
 	fs := http.FileServerFS(dist)
 	return fs
