@@ -13,6 +13,8 @@ var (
 	ErrMissingToken = errors.New("missing access token")
 )
 
+const userIDKey = "user_id"
+
 func VerifyAuth(tokenMaker token.Maker) func(http.Handler) http.Handler {
 	middlewareID := "middleware.VerifyAuth"
 	return func(next http.Handler) http.Handler {
@@ -40,7 +42,7 @@ func VerifyAuth(tokenMaker token.Maker) func(http.Handler) http.Handler {
 			}
 
 			ctx := r.Context()
-			ctx = context.WithValue(ctx, "user_id", claims.UserID)
+			ctx = context.WithValue(ctx, userIDKey, claims.UserID)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

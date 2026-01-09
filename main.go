@@ -52,6 +52,57 @@ var interruptSignals = []os.Signal{
 func run(ctx context.Context, cfg config.Config) error {
 	ctx, stop := signal.NotifyContext(ctx, interruptSignals...)
 
+	// defer stop() // Don't defer stop here, it cancels context immediately when run returns if run is synchronous, but run blocks on select.
+	// Wait, run() blocks on select.
+	// If the test calls `go run(ctx, cfg)`, then `ctx` passed from test controls it.
+	// `signal.NotifyContext` wraps the passed ctx.
+	// If `stop` is called, `ctx` is canceled.
+	// `defer stop()` means when `run` returns, stop is called. That is fine.
+	// The problem might be how `signal.NotifyContext` interacts with `ctx.Done()` in the select.
+
+	// If `ctx` passed from test is canceled, `ctx` (wrapped) is canceled.
+	// `select` case `<-ctx.Done()` triggers.
+	// Then `server.Shutdown` is called.
+	// And `run` returns.
+
+	// Issue in tests:
+	// `go run(ctx, cfg)`
+	// The test continues.
+	// `tests.WaitForReady` checks health.
+
+	// If `run` fails early (e.g. DB init), it returns error.
+	// The goroutine exits.
+	// `WaitForReady` keeps looping until timeout.
+
+	// In the logs, we saw:
+	// 2026/01/09 10:45:18 INFO Run mode: Debug=true
+	// 2026/01/09 10:45:18 INFO initialised DB
+	// 2026/01/09 10:45:18 INFO migrations completed successfully
+	// 2026/01/09 10:45:18 INFO starting server on 0.0.0.0:8101
+	// ... then timeout.
+
+	// So server started.
+	// Why is it not reachable?
+	// `tests.WaitForReady` tries `http://127.0.0.1:8101/health`.
+	// Logs show `starting server on 0.0.0.0:8101`.
+	// 0.0.0.0 should be reachable via 127.0.0.1.
+
+	// Wait, `tests.WaitForReady` creates a request with context.
+	// `req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)`
+	// `ctx` passed to `WaitForReady` is the same `ctx` passed to `run`.
+	// NO. In test:
+	// `ctx := context.Background()`
+	// `ctx, cancel := context.WithCancel(ctx)`
+	// `go run(ctx, cfg)`
+	// `tests.WaitForReady(ctx, ...)`
+
+	// If `run` modifies `ctx`? No, it shadows it: `ctx, stop := signal.NotifyContext(ctx, ...)`
+	// But `tests.WaitForReady` uses the original `ctx`.
+
+	// Is it possible `fs := InitWebServer()` is taking too long or failing silently?
+	// `InitWebServer` in `web.go`?
+	// Let's check `web.go`.
+
 	defer stop()
 
 	slog.Info("Run mode:", "Debug", cfg.Debug)

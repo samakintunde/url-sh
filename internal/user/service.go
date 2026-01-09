@@ -248,6 +248,54 @@ func (s *UserService) StartPasswordReset(ctx context.Context, args StartPassword
 	return nil
 }
 
+func (u *UserService) GetProfile(ctx context.Context, userID string) (User, error) {
+	serviceID := "service.user.GetProfile"
+	user, err := u.queries.GetUser(ctx, userID)
+	if err != nil {
+		slog.Error(serviceID, "error", err)
+		return User{}, ErrGettingUserByID
+	}
+	return fromDBUser(user), nil
+}
+
+func (u *UserService) ChangePassword(ctx context.Context, userID, oldPassword, newPassword string) error {
+	serviceID := "service.user.ChangePassword"
+	user, err := u.queries.GetUser(ctx, userID)
+	if err != nil {
+		slog.Error(serviceID, "error", err)
+		return ErrGettingUserByID
+	}
+
+	match, err := auth.VerifyPassword(oldPassword, user.Password)
+	if err != nil {
+		slog.Error(serviceID, "error", err)
+		return err
+	}
+	if !match {
+		return ErrInvalidCredentials
+	}
+
+	if err := auth.CheckPassword(newPassword); err != nil {
+		return err
+	}
+
+	hashedPassword, err := auth.HashPassword(newPassword)
+	if err != nil {
+		slog.Error(serviceID, "error", err)
+		return auth.ErrHashingPassword
+	}
+
+	if err := u.queries.UpdateUserPassword(ctx, db.UpdateUserPasswordParams{
+		ID:       userID,
+		Password: hashedPassword,
+	}); err != nil {
+		slog.Error(serviceID, "error", err)
+		return ErrUnknownError
+	}
+
+	return nil
+}
+
 type ResetPasswordParams struct {
 	Token    string
 	Password string

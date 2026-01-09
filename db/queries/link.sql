@@ -13,5 +13,14 @@ SELECT * FROM links WHERE user_id = ?;
 -- name: GetShortLinkById :one
 SELECT * FROM links WHERE user_id = ? AND id = ? LIMIT 1;
 
+-- name: GetLink :one
+SELECT * FROM links WHERE id = ? LIMIT 1;
+
+-- name: GetLinkByShortCode :one
+SELECT * FROM links WHERE short_url_id = ? LIMIT 1;
+
+-- name: GetLinkByPrettyId :one
+SELECT * FROM links WHERE pretty_id = ? LIMIT 1;
+
 -- name: GetShortLinkByShortUrlId :one
 SELECT * FROM links WHERE user_id = ? AND short_url_id = ? LIMIT 1;

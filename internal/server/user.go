@@ -289,6 +289,66 @@ func HandleStartResetPassword(ctx context.Context, validator validation.Validato
 	})
 }
 
+func HandleGetProfile(ctx context.Context, userService *user.UserService) http.Handler {
+	handlerID := "handler.user.HandleGetProfile"
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := r.Context().Value(userIDKey).(string)
+		if !ok {
+			utils.RespondWithJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
+			return
+		}
+
+		u, err := userService.GetProfile(ctx, userID)
+		if err != nil {
+			slog.Error(handlerID, "error", err)
+			utils.RespondWithJSON(w, http.StatusInternalServerError, map[string]any{"error": "failed to get profile"})
+			return
+		}
+
+		utils.RespondWithJSON(w, http.StatusOK, map[string]any{"data": newUserResponse(u)})
+	})
+}
+
+func HandleChangePassword(ctx context.Context, validator validation.Validator, userService *user.UserService) http.Handler {
+	handlerID := "handler.user.HandleChangePassword"
+	type request struct {
+		OldPassword string `json:"old_password" validate:"required"`
+		NewPassword string `json:"new_password" validate:"required,min=8,max=50,password"`
+	}
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := r.Context().Value(userIDKey).(string)
+		if !ok {
+			utils.RespondWithJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
+			return
+		}
+
+		req, err := utils.DecodeToJSON[request](r)
+		if err != nil {
+			slog.Error(handlerID, "error", err)
+			utils.RespondWithJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request"})
+			return
+		}
+
+		if errs := validator.Validate(req); errs != nil {
+			utils.RespondWithJSON(w, http.StatusBadRequest, map[string]any{"errors": errs})
+			return
+		}
+
+		if err := userService.ChangePassword(ctx, userID, req.OldPassword, req.NewPassword); err != nil {
+			slog.Error(handlerID, "error", err)
+			if err == user.ErrInvalidCredentials {
+				utils.RespondWithJSON(w, http.StatusUnauthorized, map[string]any{"error": "incorrect old password"})
+				return
+			}
+			utils.RespondWithJSON(w, http.StatusInternalServerError, map[string]any{"error": "failed to change password"})
+			return
+		}
+
+		utils.RespondWithJSON(w, http.StatusOK, map[string]any{"message": "password changed successfully"})
+	})
+}
+
 func HandleResetPassword(ctx context.Context, validator validation.Validator, userService *user.UserService) http.Handler {
 	handlerID := "handler.user.HandleStartResetPassword"
 	type request struct {

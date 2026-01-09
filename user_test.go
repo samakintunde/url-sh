@@ -18,7 +18,7 @@ func TestUserSignup(t *testing.T) {
 
 	t.Cleanup(cancel)
 
-	cfg := tests.BuildTestConfig()
+	cfg := tests.BuildTestConfig(8100)
 
 	go run(ctx, cfg)
 
