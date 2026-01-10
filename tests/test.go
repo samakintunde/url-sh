@@ -6,6 +6,8 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 	"url-shortener/internal/config"
 )
@@ -44,10 +46,17 @@ func WaitForReady(ctx context.Context, timeout time.Duration, endpoint string) e
 }
 
 func DoRequest(ctx context.Context, method string, addr string, body io.Reader) (*http.Response, error) {
+	return DoRequestWithCookie(ctx, method, addr, body, nil)
+}
+
+func DoRequestWithCookie(ctx context.Context, method string, addr string, body io.Reader, cookie *http.Cookie) (*http.Response, error) {
 	client := http.Client{}
 	req, err := http.NewRequestWithContext(ctx, method, addr, body)
 	if err != nil {
 		return nil, err
+	}
+	if cookie != nil {
+		req.AddCookie(cookie)
 	}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -60,21 +69,28 @@ func BuildRequestUrl(serverCfg config.Server, path string) string {
 	return fmt.Sprintf("http://127.0.0.1:%d%s", serverCfg.Port, path)
 }
 
-func BuildTestConfig() config.Config {
-	port := 8100
+func BuildTestConfig(port int) config.Config {
+	if port == 0 {
+		port = 8100
+	}
+	// Use a temporary file for SQLite
+	dbFile := filepath.Join(os.TempDir(), fmt.Sprintf("test_db_%d.sqlite", port))
+	// Clean up previous run
+	os.Remove(dbFile)
+
 	return config.Config{
 		Debug: true,
 		Server: config.Server{
-			Address:           fmt.Sprintf("0.0.0.0:%d", port),
+			Address:           fmt.Sprintf(":%d", port),
 			Port:              port,
-			TokenSymmetricKey: "bB34U3baPLuXWmBsol15g0aeV5VxF43f",
+			TokenSymmetricKey: "9cb334a024c38493b9529a810969cc4e",
 		},
 		Log: config.Log{
 			Level:  "debug",
 			Format: "text",
 		},
 		Database: config.Database{
-			Uri:                ":memory:",
+			Uri:                dbFile,
 			MigrationSourceURL: "file://db/migrations",
 		},
 		SMTP: config.SMTP{
